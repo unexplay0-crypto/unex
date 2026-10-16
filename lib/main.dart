@@ -458,20 +458,19 @@ class _MainDashboardState extends State<MainDashboard> {
 
   void _onEngineChange() { if (mounted) setState(() {}); }
 
-  Future<void> _bootOfflineFirstAndSync() async {
+    Future<void> _bootOfflineFirstAndSync() async {
     favoriteIds = await AppStorage.loadFavorites();
     recentItems = await AppStorage.loadRecents();
     vodProgressMap = await AppStorage.loadVodProgressMap();
 
-    // 1. ABERTURA INSTANTÂNEA (< 1 SEGUNDO) SE HOUVER CACHE EM DISCO
     final cached = await AppStorage.loadOfflinePlaylist();
     if (cached.isNotEmpty && mounted) {
       await _applyCatalog(cached, startFirstChannel: true);
     }
 
-    // 2. SINCRONIZAÇÃO EM SEGUNDO PLANO COM O SERVIDOR
     try {
-      final res = await http.get(Uri.parse(_m3uUrl), headers: kIptvHeaders).timeout(const Duration(seconds: 35));
+      // Timeout estendido para TV Boxes com internet Wi-Fi instável
+      final res = await http.get(Uri.parse(_m3uUrl), headers: kIptvHeaders).timeout(const Duration(seconds: 45));
       if (res.statusCode == 200) {
         final body = utf8.decode(res.bodyBytes, allowMalformed: true);
         final parsed = await compute(parseM3UAdvanced, body);
@@ -485,14 +484,15 @@ class _MainDashboardState extends State<MainDashboard> {
         }
       }
       if (cached.isEmpty && mounted) {
-        setState(() { isLoading = false; errorMessage = 'Não foi possível carregar a lista do servidor.'; });
+        setState(() { isLoading = false; errorMessage = 'Servidor retornou erro ou lista vazia.'; });
       }
-    } catch (_) {
+    } catch (e) {
       if (cached.isEmpty && mounted) {
-        setState(() { isLoading = false; errorMessage = 'Erro de conexão com o servidor.'; });
+        setState(() { isLoading = false; errorMessage = 'Falha de conexão na TV: Verifique a internet e o DNS.'; });
       }
     }
-  }
+    }
+  
 
   Future<void> _applyCatalog(List<StreamItem> items, {required bool startFirstChannel}) async {
     final live = <StreamItem>[], movies = <StreamItem>[], series = <StreamItem>[];
