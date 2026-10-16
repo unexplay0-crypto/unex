@@ -149,7 +149,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     );
   }
 
-  Widget _buildContentGrid() {
+    Widget _buildContentGrid() {
     final isMovie = widget.activeSection == MainSection.movie || widget.activeSection == MainSection.continueWatching;
     return GridView.builder(
       padding: const EdgeInsets.all(14),
@@ -162,18 +162,28 @@ class _TVDashboardViewState extends State<TVDashboardView> {
         
         return TVFocusableItem(
           onMoveLeft: widget.isSideMenuOpen && idx == 0 ? _focusSideMenuNow : null,
+          // Garante que ao focar ou selecionar na TV, o stream da pré-visualização seja acionado
           onSelect: () => widget.onStartPreview(item),
-          builder: (c, f) => isMovie 
-            ? buildStreamingPosterCard(title: item.name, subtitle: isPlaying ? 'Assistindo' : item.group, logoUrl: item.logo, badgeText: item.qualityTag, isFocused: f, isPlaying: isPlaying, isFavorite: isFav, onTap: () => widget.onStartPreview(item))
-            : AnimatedContainer(
-                duration: const Duration(milliseconds: 150), padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: isPlaying ? const Color(0xFF172238) : const Color(0xFF12151F), borderRadius: BorderRadius.circular(12), border: Border.all(color: f ? const Color(0xFF00E5FF) : isPlaying ? const Color(0xFF2979FF) : Colors.white10, width: f ? 2 : 1)),
-                child: Row(children: [ buildChannelLogo(item.logo, size: 44), const SizedBox(width: 8), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [ Text(item.name, maxLines: 1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), Text(item.group, maxLines: 1, style: const TextStyle(fontSize: 10, color: Colors.white54)) ])) ]),
-              ),
+          builder: (c, f) {
+            // Se o item ganhou foco na TV, atualiza a pré-visualização automaticamente em tempo real!
+            if (f && widget.activeItem?.id != item.id) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) widget.onStartPreview(item);
+              });
+            }
+            return isMovie 
+              ? buildStreamingPosterCard(title: item.name, subtitle: isPlaying ? 'Assistindo' : item.group, logoUrl: item.logo, badgeText: item.qualityTag, isFocused: f, isPlaying: isPlaying, isFavorite: isFav, onTap: () => widget.onStartPreview(item))
+              : AnimatedContainer(
+                  duration: const Duration(milliseconds: 150), padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: isPlaying ? const Color(0xFF172238) : const Color(0xFF12151F), borderRadius: BorderRadius.circular(12), border: Border.all(color: f ? const Color(0xFF00E5FF) : isPlaying ? const Color(0xFF2979FF) : Colors.white10, width: f ? 2 : 1)),
+                  child: Row(children: [ buildChannelLogo(item.logo, size: 44), const SizedBox(width: 8), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [ Text(item.name, maxLines: 1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)), Text(item.group, maxLines: 1, style: const TextStyle(fontSize: 10, color: Colors.white54)) ])) ]),
+                );
+          },
         );
       },
     );
-  }
+    }
+  
 
   Widget _buildMenu() {
     return ListView(
