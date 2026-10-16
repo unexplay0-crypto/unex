@@ -55,7 +55,7 @@ class UnexVisionApp extends StatelessWidget {
 }
 
 // =============================================================================
-// 1. BOOTg AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + ESSÃO SALVA)
+// 1. BOOT AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + SESSÃO SALVA)
 // =============================================================================
 class BootRouterScreen extends StatefulWidget {
   const BootRouterScreen({super.key});
@@ -172,7 +172,6 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
     if (!dns.startsWith('http')) dns = 'http://$dns';
     while (dns.endsWith('/')) dns = dns.substring(0, dns.length - 1);
 
-    // Regra de Negócio: Verifica se a assinatura Xtream está vencida
     try {
       final uri = Uri.parse('$dns/player_api.php?username=$user&password=$pass');
       final res = await http.get(uri, headers: kIptvHeaders).timeout(const Duration(seconds: 7));
@@ -399,27 +398,7 @@ class MainDashboard extends StatefulWidget {
   State<MainDashboard> createState() => _MainDashboardState();
 }
 
-  Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
-    _recordRecent(item);
-    Duration? startPos;
-    final saved = vodProgressMap[item.id];
-    if (item.type != ContentType.live && saved != null && _engine.currentItem?.id != item.id) {
-      startPos = await showVodResumePrompt(context: context, entry: saved);
-      if (startPos == null) return;
-    }
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      createSmoothRoute(SmartAdaptivePlayerScreen(
-        initialItem: item,
-        playlist: customList ?? (displayedItems.isNotEmpty ? displayedItems : liveItems),
-        deviceMode: _mode,
-        initialStartPosition: startPos,
-      )),
-    );
-  }
-
-
+class _MainDashboardState extends State<MainDashboard> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final SharedStreamEngine _engine = SharedStreamEngine.instance;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -452,9 +431,8 @@ class MainDashboard extends StatefulWidget {
   void initState() {
     super.initState();
     _mode = widget.deviceMode;
-    // Controle Estrito de Memória de Imagens para TV Boxes de 1GB/2GB RAM
     PaintingBinding.instance.imageCache.maximumSize = 120;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 35 << 20; // Máx 35 MB
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 35 << 20;
 
     _engine.addListener(_onEngineChange);
     _engine.onVodProgressSaved = (entry) {
@@ -478,7 +456,7 @@ class MainDashboard extends StatefulWidget {
 
   void _onEngineChange() { if (mounted) setState(() {}); }
 
-    Future<void> _bootOfflineFirstAndSync() async {
+  Future<void> _bootOfflineFirstAndSync() async {
     favoriteIds = await AppStorage.loadFavorites();
     recentItems = await AppStorage.loadRecents();
     vodProgressMap = await AppStorage.loadVodProgressMap();
@@ -489,7 +467,6 @@ class MainDashboard extends StatefulWidget {
     }
 
     try {
-      // Timeout estendido para TV Boxes com internet Wi-Fi instável
       final res = await http.get(Uri.parse(_m3uUrl), headers: kIptvHeaders).timeout(const Duration(seconds: 45));
       if (res.statusCode == 200) {
         final body = utf8.decode(res.bodyBytes, allowMalformed: true);
@@ -504,15 +481,14 @@ class MainDashboard extends StatefulWidget {
         }
       }
       if (cached.isEmpty && mounted) {
-        setState(() { isLoading = false; errorMessage = 'Servidor retornou erro ou lista vazia.'; });
+        setState(() { isLoading = false; errorMessage = 'Não foi possível carregar a lista do servidor.'; });
       }
-    } catch (e) {
+    } catch (_) {
       if (cached.isEmpty && mounted) {
-        setState(() { isLoading = false; errorMessage = 'Falha de conexão na TV: Verifique a internet e o DNS.'; });
+        setState(() { isLoading = false; errorMessage = 'Erro de conexão com o servidor.'; });
       }
     }
-    }
-  
+  }
 
   Future<void> _applyCatalog(List<StreamItem> items, {required bool startFirstChannel}) async {
     final live = <StreamItem>[], movies = <StreamItem>[], series = <StreamItem>[];
@@ -528,13 +504,15 @@ class MainDashboard extends StatefulWidget {
       isLoading = false; errorMessage = '';
       _rebuildCategories();
     });
+
     if (startFirstChannel && _engine.currentItem == null) {
       final initial = recentItems.isNotEmpty ? recentItems.first : (live.isNotEmpty ? live.first : items.first);
       _engine.openStream(initial);
+    } else if (_engine.currentItem != null && _engine.controller == null) {
+      _engine.openStream(_engine.currentItem!);
     }
   }
 
-  // CHECAGEM REMOTA DE ATUALIZAÇÃO (OTA CHECK)
   Future<void> _checkOtaUpdateSilently() async {
     try {
       final res = await http.get(Uri.parse(kOtaCheckUrl)).timeout(const Duration(seconds: 5));
@@ -646,10 +624,28 @@ class MainDashboard extends StatefulWidget {
     AppStorage.saveRecents(recentItems);
   }
 
-    void _handlePreviewOrPlay(StreamItem item) {
+  Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
     _recordRecent(item);
-    
-    // Se o usuário apertar OK ou navegar para um item na TV, disparamos o stream imediatamente
+    Duration? startPos;
+    final saved = vodProgressMap[item.id];
+    if (item.type != ContentType.live && saved != null && _engine.currentItem?.id != item.id) {
+      startPos = await showVodResumePrompt(context: context, entry: saved);
+      if (startPos == null) return;
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      createSmoothRoute(SmartAdaptivePlayerScreen(
+        initialItem: item,
+        playlist: customList ?? (displayedItems.isNotEmpty ? displayedItems : liveItems),
+        deviceMode: _mode,
+        initialStartPosition: startPos,
+      )),
+    );
+  }
+
+  void _handlePreviewOrPlay(StreamItem item) {
+    _recordRecent(item);
     if (_engine.currentItem?.id == item.id && _engine.isReady) {
       if (item.type == ContentType.movie) {
         _showVodMetadataSheet(item);
@@ -658,13 +654,9 @@ class MainDashboard extends StatefulWidget {
       }
       return;
     }
-
-    // Dispara a abertura do stream na pré-visualização da TV ou Celular
     _engine.openStream(item);
   }
 
-
-  // MODAL DE METADADOS EXPANDIDOS VOD (SINOPSE, AVALIAÇÃO, ANO E EPISÓDIOS)
   void _showVodMetadataSheet(StreamItem item) {
     showDialog(
       context: context,
@@ -850,18 +842,35 @@ class MainDashboard extends StatefulWidget {
             ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))
             : errorMessage.isNotEmpty
                 ? Center(
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(errorMessage, style: const TextStyle(color: Colors.white70)),
-                      const SizedBox(height: 14),
-                      ElevatedButton(
-                        onPressed: () async {
-                          await AppStorage.clearAllData();
-                          if (!mounted) return;
-                          Navigator.pushReplacement(context, createSmoothRoute(LoginGatewayScreen(deviceMode: _mode)));
-                        },
-                        child: const Text('Voltar ao Login'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.tv_off_rounded, color: Colors.redAccent, size: 48),
+                          const SizedBox(height: 14),
+                          Text(errorMessage, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                          const SizedBox(height: 20),
+                          TVFocusableItem(
+                            autofocus: true,
+                            autoScroll: false,
+                            onSelect: () async {
+                              await AppStorage.clearAllData();
+                              if (!mounted) return;
+                              Navigator.pushReplacement(context, createSmoothRoute(LoginGatewayScreen(deviceMode: _mode)));
+                            },
+                            builder: (c, f) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: f ? Colors.white : const Color(0xFF00E5FF),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text('Corrigir Dados no Login', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
                       ),
-                    ]),
+                    ),
                   )
                 : isTV
                     ? TVDashboardView(
@@ -892,7 +901,6 @@ class MainDashboard extends StatefulWidget {
   }
 }
 
-// Teclado Virtual Compacto em Dock para o Login da TV
 Future<void> _openCompactTVKeyboard(BuildContext context, TextEditingController ctrl, String title) async {
   const rows = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
   const webKeys = ['http://', 'https://', '.club', '.com', '.net', ':8080', '/', ':', '.', '-', '_', '?', '=', '&'];
