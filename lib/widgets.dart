@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'core.dart';
 
-// =============================================================================
-// COMPONENTES OTIMIZADOS E CONTROLES DE TV
-// =============================================================================
-
 class TVFocusableItem extends StatefulWidget {
   final VoidCallback onSelect;
   final Widget Function(BuildContext context, bool isFocused) builder;
@@ -61,7 +57,6 @@ class TVIconButton extends StatelessWidget {
   }
 }
 
-// Controle de Cache para Imagens (Prevenção de OutOfMemory)
 Widget buildStreamingPosterCard({required String title, required String subtitle, required String logoUrl, required String badgeText, required VoidCallback onTap, bool isFocused = false, bool isPlaying = false, bool isFavorite = false, double? progress, VoidCallback? onFavoriteTap}) {
   return AnimatedScale(
     scale: isFocused ? 1.06 : 1.0, duration: const Duration(milliseconds: 150),
@@ -75,7 +70,7 @@ Widget buildStreamingPosterCard({required String title, required String subtitle
         child: Stack(
           fit: StackFit.expand,
           children: [
-            logoUrl.isNotEmpty ? Image.network(logoUrl, fit: BoxFit.cover, memCacheWidth: 200, errorBuilder: (_,__,___) => const Icon(Icons.movie, color: Color(0xFF00E5FF))) : const Icon(Icons.movie, color: Color(0xFF00E5FF)),
+            logoUrl.isNotEmpty ? Image.network(logoUrl, fit: BoxFit.cover, cacheWidth: 200, errorBuilder: (_,__,___) => const Icon(Icons.movie, color: Color(0xFF00E5FF))) : const Icon(Icons.movie, color: Color(0xFF00E5FF)),
             Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black38, Colors.transparent, Colors.black87], stops: const [0.0, 0.4, 1.0]))),
             Positioned(top: 8, left: 8, child: buildQualityBadge(badgeText)),
             if (onFavoriteTap != null) Positioned(top: 6, right: 6, child: GestureDetector(onTap: onFavoriteTap, child: Icon(isFavorite ? Icons.star : Icons.star_border, color: isFavorite ? Colors.amber : Colors.white70, size: 20))),
@@ -114,11 +109,10 @@ Widget buildChannelLogo(String url, {double size = 44}) {
   return Container(
     width: size, height: size,
     decoration: BoxDecoration(color: const Color(0xFF08090E), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white10)),
-    child: ClipRRect(borderRadius: BorderRadius.circular(10), child: url.isNotEmpty ? Image.network(url, fit: BoxFit.contain, memCacheWidth: 100, errorBuilder: (_,__,___) => const Icon(Icons.tv, color: Color(0xFF00E5FF))) : const Icon(Icons.tv, color: Color(0xFF00E5FF))),
+    child: ClipRRect(borderRadius: BorderRadius.circular(10), child: url.isNotEmpty ? Image.network(url, fit: BoxFit.contain, cacheWidth: 100, errorBuilder: (_,__,___) => const Icon(Icons.tv, color: Color(0xFF00E5FF))) : const Icon(Icons.tv, color: Color(0xFF00E5FF))),
   );
 }
 
-// Modal de Retomada VOD
 Future<Duration?> showVodResumePrompt({required BuildContext context, required VodProgressEntry entry}) async {
   return showDialog<Duration?>(
     context: context,
