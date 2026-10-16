@@ -55,7 +55,7 @@ class UnexVisionApp extends StatelessWidget {
 }
 
 // =============================================================================
-// 1. BOOT AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + SESSÃO SALVA)
+// 1. BOOT AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + ESSÃO SALVA)
 // =============================================================================
 class BootRouterScreen extends StatefulWidget {
   const BootRouterScreen({super.key});
