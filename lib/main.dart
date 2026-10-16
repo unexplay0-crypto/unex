@@ -399,7 +399,27 @@ class MainDashboard extends StatefulWidget {
   State<MainDashboard> createState() => _MainDashboardState();
 }
 
-class _MainDashboardState extends State<MainDashboard> {
+  Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
+    _recordRecent(item);
+    Duration? startPos;
+    final saved = vodProgressMap[item.id];
+    if (item.type != ContentType.live && saved != null && _engine.currentItem?.id != item.id) {
+      startPos = await showVodResumePrompt(context: context, entry: saved);
+      if (startPos == null) return;
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      createSmoothRoute(SmartAdaptivePlayerScreen(
+        initialItem: item,
+        playlist: customList ?? (displayedItems.isNotEmpty ? displayedItems : liveItems),
+        deviceMode: _mode,
+        initialStartPosition: startPos,
+      )),
+    );
+  }
+
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final SharedStreamEngine _engine = SharedStreamEngine.instance;
   final TextEditingController _searchCtrl = TextEditingController();
