@@ -626,39 +626,23 @@ class _MainDashboardState extends State<MainDashboard> {
     AppStorage.saveRecents(recentItems);
   }
 
-  void _handlePreviewOrPlay(StreamItem item) {
+    void _handlePreviewOrPlay(StreamItem item) {
     _recordRecent(item);
-    // Se for Filme, abre a ficha de Sinopse/Avaliação antes ou vai p/ tela cheia no 2º clique
-    if (item.type == ContentType.movie && _engine.currentItem?.id == item.id) {
-      _showVodMetadataSheet(item);
+    
+    // Se o usuário apertar OK ou navegar para um item na TV, disparamos o stream imediatamente
+    if (_engine.currentItem?.id == item.id && _engine.isReady) {
+      if (item.type == ContentType.movie) {
+        _showVodMetadataSheet(item);
+      } else {
+        _openFullScreen(item);
+      }
       return;
     }
-    if (_engine.currentItem?.id == item.id) {
-      _openFullScreen(item);
-      return;
-    }
+
+    // Dispara a abertura do stream na pré-visualização da TV ou Celular
     _engine.openStream(item);
   }
 
-  Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
-    _recordRecent(item);
-    Duration? startPos;
-    final saved = vodProgressMap[item.id];
-    if (item.type != ContentType.live && saved != null && _engine.currentItem?.id != item.id) {
-      startPos = await showVodResumePrompt(context: context, entry: saved);
-      if (startPos == null) return;
-    }
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      createSmoothRoute(SmartAdaptivePlayerScreen(
-        initialItem: item,
-        playlist: customList ?? (displayedItems.isNotEmpty ? displayedItems : liveItems),
-        deviceMode: _mode,
-        initialStartPosition: startPos,
-      )),
-    );
-  }
 
   // MODAL DE METADADOS EXPANDIDOS VOD (SINOPSE, AVALIAÇÃO, ANO E EPISÓDIOS)
   void _showVodMetadataSheet(StreamItem item) {
