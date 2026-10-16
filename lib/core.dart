@@ -367,7 +367,14 @@ class SharedStreamEngine extends ChangeNotifier {
   Future<void> seekRelative(int seconds) async {
     if (controller == null || !isReady) return;
     final target = controller!.value.position + Duration(seconds: seconds);
-    await controller!.seekTo(target.clamp(Duration.zero, controller!.value.duration));
+        Duration finalTarget = target;
+    if (finalTarget < Duration.zero) {
+      finalTarget = Duration.zero;
+    } else if (finalTarget > controller!.value.duration) {
+      finalTarget = controller!.value.duration;
+    }
+    await controller!.seekTo(finalTarget);
+
     _saveCurrentVodProgressImmediately();
     notifyListeners();
   }
