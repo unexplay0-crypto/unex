@@ -28,16 +28,9 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
   late StreamItem currentItem;
 
   bool showOsd = true;
-  bool showQuickChannelDrawer = false; // Usado apenas na TV
+  bool showDrawer = false;
   Timer? _hideTimer;
-  final FocusNode _playPauseFocusNode = FocusNode();
-
-  // Variáveis para Gestos Táteis no Celular
-  double _gestureStartVolume = 0.5;
-  double _gestureStartBrightness = 0.5;
-  int _gestureSeekSeconds = 0;
-  bool _isSeekingByGesture = false;
-  String _gestureOverlayText = '';
+  final FocusNode _playPauseNode = FocusNode();
 
   @override
   void initState() {
@@ -47,9 +40,10 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
 
     _engine.openStream(currentItem, startPosition: widget.initialStartPosition);
     _resetOsdTimer();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && showOsd && widget.deviceMode == DeviceMode.tv) {
-        _playPauseFocusNode.requestFocus();
+      if (mounted && widget.deviceMode == DeviceMode.tv) {
+        _playPauseNode.requestFocus();
       }
     });
   }
@@ -57,21 +51,22 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    _playPauseFocusNode.dispose();
+    _playPauseNode.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
   void _switchStream(StreamItem item) {
-    setState(() { currentItem = item; showOsd = true; });
+    setState(() { currentItem = item; showOsd = true; showDrawer = false; });
     _engine.openStream(item);
     _resetOsdTimer();
+    if (widget.deviceMode == DeviceMode.tv) _playPauseNode.requestFocus();
   }
 
   void _resetOsdTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && !showQuickChannelDrawer) setState(() => showOsd = false);
+    _hideTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && !showDrawer) setState(() => showOsd = false);
     });
   }
 
@@ -90,98 +85,69 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
     return hours > 0 ? '$hours:$mins:$secs' : '$mins:$secs';
   }
 
-  // ===========================================================================
-  // GESTOS TÁTEIS (EXCLUSIVO CELULAR)
-  // ===========================================================================
-  void _onPanStart(DragStartDetails details) async {
-    if (widget.deviceMode == DeviceMode.tv) return;
-    _isSeekingByGesture = false;
-    _gestureSeekSeconds = 0;
-    try {
-      _gestureStartVolume = await nativeChannel.invokeMethod('getVolume') ?? 0.5;
-      _gestureStartBrightness = await nativeChannel.invokeMethod('getBrightness') ?? 0.5;
-    } catch (_) {}
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (widget.deviceMode == DeviceMode.tv) return;
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-
-    if (details.delta.dx.abs() > details.delta.dy.abs() && currentItem.type != ContentType.live) {
-      _isSeekingByGesture = true;
-      _gestureSeekSeconds += (details.delta.dx / width * 300).round();
-      setState(() {
-        showOsd = true;
-        _gestureOverlayText = _gestureSeekSeconds > 0 ? '+${_gestureSeekSeconds}s' : '${_gestureSeekSeconds}s';
-      });
-      _resetOsdTimer();
-      return;
-    }
-
-    if (!_isSeekingByGesture) {
-      final isLeftSide = details.globalPosition.dx < width / 2;
-      final delta = -(details.delta.dy / height);
-
-      if (isLeftSide) {
-        _gestureStartBrightness = (_gestureStartBrightness + delta).clamp(0.05, 1.0);
-        nativeChannel.invokeMethod('setBrightness', {'value': _gestureStartBrightness});
-        setState(() { showOsd = true; _gestureOverlayText = 'Brilho: ${(_gestureStartBrightness * 100).toInt()}%'; });
+  void _toggleOsd() {
+    setState(() {
+      if (showDrawer) {
+        showDrawer = false;
       } else {
-        _gestureStartVolume = (_gestureStartVolume + delta).clamp(0.0, 1.0);
-        nativeChannel.invokeMethod('setVolume', {'value': _gestureStartVolume});
-        setState(() { showOsd = true; _gestureOverlayText = 'Volume: ${(_gestureStartVolume * 100).toInt()}%'; });
+        showOsd = !showOsd;
       }
+    });
+    if (showOsd) {
       _resetOsdTimer();
+      if (widget.deviceMode == DeviceMode.tv) _playPauseNode.requestFocus();
     }
   }
 
-  void _onPanEnd(DragEndDetails details) {
-    if (widget.deviceMode == DeviceMode.tv) return;
-    if (_isSeekingByGesture && _gestureSeekSeconds != 0) _engine.seekRelative(_gestureSeekSeconds);
-    setState(() { _gestureOverlayText = ''; _isSeekingByGesture = false; });
-  }
-
   // ===========================================================================
-  // INTERFACE REFORMULADA: CELULAR
+  // GAVETA DE CANAIS / EPISÓDIOS (MENU LATERAL)
   // ===========================================================================
-  void _showMobileChannelList() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF101420),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6, minChildSize: 0.4, maxChildSize: 0.9,
-        expand: false,
-        builder: (_, scrollController) => Column(
+  Widget _buildSideDrawer() {
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      top: 0, bottom: 0,
+      right: showDrawer ? 0 : -320,
+      width: 300,
+      child: Container(
+        color: const Color(0xFF0A0C12).withOpacity(0.95),
+        child: Column(
           children: [
-            Container(margin: const EdgeInsets.symmetric(vertical: 12), width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(currentItem.type == ContentType.live ? 'Canais Disponíveis' : 'Lista de Reprodução', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
-                  Text('${widget.playlist.length} itens', style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                  Text(currentItem.type == ContentType.live ? 'Canais' : 'Lista', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00E5FF), fontSize: 16)),
+                  TVIconButton(icon: Icons.close_rounded, onPressed: () => setState(() => showDrawer = false)),
                 ],
               ),
             ),
             const Divider(color: Colors.white10),
             Expanded(
               child: ListView.builder(
-                controller: scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 itemCount: widget.playlist.length,
                 itemBuilder: (context, idx) {
                   final item = widget.playlist[idx];
                   final isPlaying = item.id == currentItem.id;
-                  return ListTile(
-                    tileColor: isPlaying ? const Color(0xFF00E5FF).withOpacity(0.1) : Colors.transparent,
-                    leading: buildChannelLogo(item.logo, size: 40),
-                    title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal, color: isPlaying ? const Color(0xFF00E5FF) : Colors.white)),
-                    subtitle: Text(item.group, maxLines: 1, style: const TextStyle(fontSize: 11, color: Colors.white54)),
-                    trailing: isPlaying ? const Icon(Icons.play_circle_fill, color: Color(0xFF00E5FF)) : null,
-                    onTap: () { Navigator.pop(ctx); if (!isPlaying) _switchStream(item); },
+                  return TVFocusableItem(
+                    autofocus: isPlaying && showDrawer && widget.deviceMode == DeviceMode.tv,
+                    onSelect: () => _switchStream(item),
+                    builder: (c, isFocused) => Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        color: isPlaying ? const Color(0xFF00E5FF).withOpacity(0.15) : isFocused ? Colors.white10 : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isFocused ? const Color(0xFF00E5FF) : Colors.transparent),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        leading: buildChannelLogo(item.logo, size: 36),
+                        title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal, color: isPlaying ? const Color(0xFF00E5FF) : Colors.white)),
+                        trailing: isPlaying ? const Icon(Icons.play_circle_fill, color: Color(0xFF00E5FF), size: 20) : null,
+                      ),
+                    ),
                   );
                 },
               ),
@@ -192,303 +158,231 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
     );
   }
 
-  Widget _buildMobileUI() {
-    final ctrl = _engine.controller;
-    final isReady = _engine.isReady && ctrl != null;
-    final isVod = currentItem.type != ContentType.live;
+  // ===========================================================================
+  // INTERFACE PRINCIPAL DO PLAYER (ESTILO NETFLIX)
+  // ===========================================================================
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _engine,
+      builder: (context, _) {
+        final ctrl = _engine.controller;
+        final isReady = _engine.isReady && ctrl != null;
+        final isVod = currentItem.type != ContentType.live;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () { setState(() => showOsd = !showOsd); _resetOsdTimer(); },
-        onPanStart: _onPanStart,
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // 1. VIDEO
-            Center(
-              child: _engine.hasError
-                  ? Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.redAccent, size: 50),
-                        const SizedBox(height: 10),
-                        const Text('Sinal Indisponível', style: TextStyle(color: Colors.white70)),
-                        const SizedBox(height: 10),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF)),
-                          onPressed: () => _engine.openStream(currentItem, forceReload: true, tryHlsFallback: true),
-                          child: const Text('Tentar Novamente', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                        )
-                      ],
-                    )
-                  : isReady ? AspectRatio(aspectRatio: ctrl.value.aspectRatio, child: VideoPlayer(ctrl)) : const CircularProgressIndicator(color: Color(0xFF00E5FF)),
-            ),
-
-            // 2. OVERLAY TEXTO DE GESTOS
-            if (_gestureOverlayText.isNotEmpty)
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF00E5FF))),
-                  child: Text(_gestureOverlayText, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF00E5FF))),
-                ),
-              ),
-
-            // 3. OSD INTUITIVO DO CELULAR
-            if (showOsd)
-              Container(
-                color: Colors.black.withOpacity(0.55), // Fundo escurecido para destacar botões
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      // BARRA SUPERIOR
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        child: Row(
-                          children: [
-                            IconButton(icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32), onPressed: () => Navigator.pop(context)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(currentItem.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                  Text(currentItem.group, style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF))),
-                                ],
-                              ),
-                            ),
-                            buildQualityBadge(currentItem.qualityTag),
-                          ],
-                        ),
-                      ),
-                      
-                      const Spacer(),
-
-                      // CONTROLES CENTRAIS GIGANTES
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                            iconSize: 48, color: Colors.white,
-                            icon: Icon(isVod ? Icons.replay_10_rounded : Icons.skip_previous_rounded),
-                            onPressed: () { isVod ? _engine.seekRelative(-10) : _stepChannel(-1); _resetOsdTimer(); },
-                          ),
-                          GestureDetector(
-                            onTap: () { _engine.togglePlayPause(); _resetOsdTimer(); },
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: const Color(0xFF00E5FF).withOpacity(0.2), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00E5FF), width: 2)),
-                              child: Icon(isReady && ctrl!.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 64, color: const Color(0xFF00E5FF)),
-                            ),
-                          ),
-                          IconButton(
-                            iconSize: 48, color: Colors.white,
-                            icon: Icon(isVod ? Icons.forward_10_rounded : Icons.skip_next_rounded),
-                            onPressed: () { isVod ? _engine.seekRelative(10) : _stepChannel(1); _resetOsdTimer(); },
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // BARRA INFERIOR (VOD VS AO VIVO)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        child: isVod && isReady
-                            ? Column(
-                                children: [
-                                  VideoProgressIndicator(ctrl!, allowScrubbing: true, padding: const EdgeInsets.symmetric(vertical: 12), colors: const VideoProgressColors(playedColor: Color(0xFF00E5FF), backgroundColor: Colors.white24)),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(_formatDuration(ctrl.value.position), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                      Text(_formatDuration(ctrl.value.duration), style: const TextStyle(fontSize: 12, color: Colors.white70)),
-                                    ],
-                                  ),
-                                ],
+        return PopScope(
+          canPop: !showDrawer && !showOsd,
+          onPopInvoked: (didPop) {
+            if (!didPop) {
+              if (showDrawer) setState(() => showDrawer = false);
+              else if (showOsd) setState(() => showOsd = false);
+            }
+          },
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Focus(
+              autofocus: true,
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent) {
+                  final key = event.logicalKey;
+                  if (key == LogicalKeyboardKey.mediaPlayPause) { _engine.togglePlayPause(); _resetOsdTimer(); return KeyEventResult.handled; }
+                  if (key == LogicalKeyboardKey.channelUp || key == LogicalKeyboardKey.arrowUp) { _stepChannel(-1); return KeyEventResult.handled; }
+                  if (key == LogicalKeyboardKey.channelDown || key == LogicalKeyboardKey.arrowDown) { _stepChannel(1); return KeyEventResult.handled; }
+                  
+                  if (!showOsd && !showDrawer) {
+                    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.gameButtonA) {
+                      _toggleOsd(); return KeyEventResult.handled;
+                    }
+                    if (key == LogicalKeyboardKey.arrowLeft) {
+                      if (isVod) { _engine.seekRelative(-10); _toggleOsd(); } else { setState(() => showDrawer = true); }
+                      return KeyEventResult.handled;
+                    }
+                    if (key == LogicalKeyboardKey.arrowRight) {
+                      if (isVod) { _engine.seekRelative(10); _toggleOsd(); }
+                      return KeyEventResult.handled;
+                    }
+                  } else {
+                    _resetOsdTimer();
+                  }
+                }
+                return KeyEventResult.ignored;
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // CAMADA 1: VÍDEO
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _toggleOsd,
+                    child: Center(
+                      child: _engine.hasError
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.redAccent, size: 50),
+                              const SizedBox(height: 10),
+                              const Text('Sinal Indisponível', style: TextStyle(color: Colors.white70)),
+                              const SizedBox(height: 14),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('Tentar Novamente', style: TextStyle(fontWeight: FontWeight.bold)),
+                                onPressed: () => _engine.openStream(currentItem, forceReload: true, tryHlsFallback: true),
                               )
-                            : Row(
-                                children: [
-                                  if (_engine.currentEpg != null)
+                            ],
+                          )
+                        : isReady ? AspectRatio(aspectRatio: ctrl.value.aspectRatio, child: VideoPlayer(ctrl)) : const CircularProgressIndicator(color: Color(0xFF00E5FF)),
+                    ),
+                  ),
+
+                  // CAMADA 2: OSD (CONTROLES ESTILO NETFLIX)
+                  AnimatedOpacity(
+                    opacity: showOsd ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 250),
+                    child: IgnorePointer(
+                      ignoring: !showOsd,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                            colors: [Colors.black87, Colors.black45, Colors.transparent, Colors.black54, Colors.black87],
+                            stops: [0.0, 0.2, 0.5, 0.8, 1.0],
+                          ),
+                        ),
+                        child: SafeArea(
+                          child: Column(
+                            children: [
+                              // BARRA SUPERIOR
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    TVIconButton(icon: Icons.arrow_back_ios_new_rounded, size: 24, onPressed: () => Navigator.pop(context)),
+                                    const SizedBox(width: 16),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          const Text('AGORA NA TV', style: TextStyle(fontSize: 10, color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                          Text(_engine.currentEpg!.nowTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                          Text(currentItem.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                                          const SizedBox(height: 2),
+                                          Text(currentItem.group, style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
                                         ],
                                       ),
-                                    )
-                                  else
-                                    const Spacer(),
-                                  
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A2133), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                                    icon: const Icon(Icons.format_list_bulleted_rounded, color: Color(0xFF00E5FF)),
-                                    label: const Text('Canais', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    onPressed: () { _hideTimer?.cancel(); _showMobileChannelList(); },
-                                  )
-                                ],
+                                    ),
+                                    buildQualityBadge(currentItem.qualityTag),
+                                  ],
+                                ),
                               ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  // ===========================================================================
-  // INTERFACE INTACTA: ANDROID TV
-  // ===========================================================================
-  Widget _buildTVUI() {
-    final ctrl = _engine.controller;
-    final isReady = _engine.isReady && ctrl != null;
-    final isVod = currentItem.type != ContentType.live;
+                              const Spacer(),
 
-    return PopScope(
-      canPop: !showQuickChannelDrawer && !showOsd,
-      onPopInvoked: (didPop) {
-        if (!didPop) {
-          if (showQuickChannelDrawer) setState(() => showQuickChannelDrawer = false);
-          else if (showOsd) setState(() => showOsd = false);
-        }
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Focus(
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent) {
-              final key = event.logicalKey;
-              if (key == LogicalKeyboardKey.mediaPlayPause) { _engine.togglePlayPause(); _resetOsdTimer(); return KeyEventResult.handled; }
-              if (key == LogicalKeyboardKey.channelUp || key == LogicalKeyboardKey.arrowUp) { _stepChannel(-1); return KeyEventResult.handled; }
-              if (key == LogicalKeyboardKey.channelDown || key == LogicalKeyboardKey.arrowDown) { _stepChannel(1); return KeyEventResult.handled; }
-              if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.gameButtonA) {
-                setState(() => showOsd = true); _resetOsdTimer(); return KeyEventResult.handled;
-              }
-              if (key == LogicalKeyboardKey.arrowLeft) {
-                if (isVod) { _engine.seekRelative(-10); setState(() => showOsd = true); } 
-                else { setState(() => showQuickChannelDrawer = true); }
-                return KeyEventResult.handled;
-              }
-              if (key == LogicalKeyboardKey.arrowRight) {
-                if (isVod) { _engine.seekRelative(10); setState(() => showOsd = true); }
-                return KeyEventResult.handled;
-              }
-              _resetOsdTimer();
-            }
-            return KeyEventResult.ignored;
-          },
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              if (showQuickChannelDrawer) setState(() => showQuickChannelDrawer = false);
-              else { setState(() => showOsd = !showOsd); _resetOsdTimer(); }
-            },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Center(
-                  child: _engine.hasError
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, color: Colors.redAccent, size: 50),
-                          const SizedBox(height: 10),
-                          const Text('Sinal Indisponível ou Codec Não Suportado', style: TextStyle(color: Colors.white70)),
-                          const SizedBox(height: 10),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF)),
-                            onPressed: () => _engine.openStream(currentItem, forceReload: true, tryHlsFallback: true),
-                            child: const Text('Forçar Codec de Software (Fallback)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                          )
-                        ],
-                      )
-                    : isReady ? AspectRatio(aspectRatio: ctrl.value.aspectRatio, child: VideoPlayer(ctrl)) : const CircularProgressIndicator(color: Color(0xFF00E5FF)),
-                ),
-
-                if (showOsd)
-                  Container(
-                    decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black87, Colors.transparent, Colors.transparent, Colors.black87])),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            TVIconButton(icon: Icons.arrow_back_ios_new_rounded, onPressed: () => Navigator.pop(context)),
-                            TVIconButton(icon: Icons.menu_open_rounded, color: const Color(0xFF00E5FF), onPressed: () => setState(() => showQuickChannelDrawer = !showQuickChannelDrawer)),
-                            const SizedBox(width: 8),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(currentItem.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              Text(currentItem.group, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
-                            ])),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(color: const Color(0xFF10131D).withOpacity(0.94), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white12)),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!isVod && _engine.currentEpg != null)
-                                Row(children: [
-                                  Container(padding: const EdgeInsets.all(4), decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(4)), child: const Text('AGORA', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold))),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text(_engine.currentEpg!.nowTitle, maxLines: 1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                                  Text('A Seguir: ${_engine.currentEpg!.nextTitle}', style: const TextStyle(fontSize: 10, color: Color(0xFF00E5FF))),
-                                ]),
-                              if (isVod && isReady)
-                                Column(children: [
-                                  VideoProgressIndicator(ctrl!, allowScrubbing: true, colors: const VideoProgressColors(playedColor: Color(0xFF00E5FF), backgroundColor: Colors.white10)),
-                                  const SizedBox(height: 4),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                    Text(_formatDuration(ctrl.value.position), style: const TextStyle(fontSize: 10)),
-                                    Text(_formatDuration(ctrl.value.duration), style: const TextStyle(fontSize: 10)),
-                                  ]),
-                                ]),
-                              const SizedBox(height: 8),
+                              // CONTROLES CENTRAIS
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  TVIconButton(icon: Icons.skip_previous_rounded, onPressed: () => _stepChannel(-1)),
-                                  if (isVod) TVIconButton(icon: Icons.replay_10_rounded, onPressed: () => _engine.seekRelative(-10)),
+                                  TVIconButton(
+                                    icon: isVod ? Icons.replay_10_rounded : Icons.skip_previous_rounded,
+                                    size: 42,
+                                    onPressed: () { isVod ? _engine.seekRelative(-10) : _stepChannel(-1); _resetOsdTimer(); },
+                                  ),
+                                  const SizedBox(width: 40),
                                   TVFocusableItem(
-                                    focusNode: _playPauseFocusNode, autofocus: true, onSelect: _engine.togglePlayPause,
-                                    builder: (c, f) => Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 8), padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(color: f ? const Color(0xFF00E5FF).withOpacity(0.25) : Colors.transparent, shape: BoxShape.circle, border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.transparent, width: 2)),
-                                      child: Icon(isReady && ctrl!.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill, color: const Color(0xFF00E5FF), size: 34),
+                                    focusNode: _playPauseNode,
+                                    autofocus: true,
+                                    onSelect: () { _engine.togglePlayPause(); _resetOsdTimer(); },
+                                    builder: (c, f) => AnimatedScale(
+                                      scale: f ? 1.1 : 1.0,
+                                      duration: const Duration(milliseconds: 150),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(color: f ? const Color(0xFF00E5FF) : Colors.black54, shape: BoxShape.circle, border: Border.all(color: const Color(0xFF00E5FF), width: 2)),
+                                        child: Icon(isReady && ctrl!.value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 54, color: f ? Colors.black : Colors.white),
+                                      ),
                                     ),
                                   ),
-                                  if (isVod) TVIconButton(icon: Icons.forward_10_rounded, onPressed: () => _engine.seekRelative(10)),
-                                  TVIconButton(icon: Icons.skip_next_rounded, onPressed: () => _stepChannel(1)),
+                                  const SizedBox(width: 40),
+                                  TVIconButton(
+                                    icon: isVod ? Icons.forward_10_rounded : Icons.skip_next_rounded,
+                                    size: 42,
+                                    onPressed: () { isVod ? _engine.seekRelative(10) : _stepChannel(1); _resetOsdTimer(); },
+                                  ),
                                 ],
+                              ),
+
+                              const Spacer(),
+
+                              // BARRA INFERIOR (LINHA DO TEMPO)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: isVod && isReady
+                                          ? Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Text(_formatDuration(ctrl!.value.position), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                                                    Text(_formatDuration(ctrl.value.duration), style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 6),
+                                                VideoProgressIndicator(ctrl, allowScrubbing: true, padding: const EdgeInsets.symmetric(vertical: 8), colors: const VideoProgressColors(playedColor: Color(0xFF00E5FF), bufferedColor: Colors.white24, backgroundColor: Colors.white10)),
+                                              ],
+                                            )
+                                          : Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.circle, color: Colors.redAccent, size: 10),
+                                                    const SizedBox(width: 6),
+                                                    const Text('AO VIVO', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                                    if (_engine.currentEpg != null) ...[
+                                                      const SizedBox(width: 12),
+                                                      Expanded(child: Text('• ${_engine.currentEpg!.nowTitle}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: Colors.white70))),
+                                                    ]
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                    const SizedBox(width: 20),
+                                    TVFocusableItem(
+                                      onSelect: () { setState(() => showDrawer = true); _resetOsdTimer(); },
+                                      builder: (c, f) => Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        decoration: BoxDecoration(color: f ? const Color(0xFF00E5FF) : Colors.white10, borderRadius: BorderRadius.circular(8), border: Border.all(color: f ? Colors.white : Colors.transparent)),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.format_list_bulleted_rounded, size: 20, color: f ? Colors.black : Colors.white),
+                                            const SizedBox(width: 8),
+                                            Text(isVod ? 'Episódios' : 'Canais', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: f ? Colors.black : Colors.white)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        )
-                      ],
+                        ),
+                      ),
                     ),
                   ),
-              ],
+
+                  // CAMADA 3: MENU LATERAL (GAVETA DE CANAIS)
+                  _buildSideDrawer(),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return widget.deviceMode == DeviceMode.mobile ? _buildMobileUI() : _buildTVUI();
   }
 }
