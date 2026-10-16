@@ -1143,7 +1143,7 @@ class _MainDashboardState extends State<MainDashboard> {
       isLoading = false;
     });
 
-    // Sem último canal salvo: pré-visualiza o 1º canal ao vivo (nunca um filme).
+    // Sem último canal salvo: pré-visualiza o 1º canal ao vivo (nunca um filme)
     if (!silent && d.live.isNotEmpty && _engine.currentItem == null) {
       _startPreview(d.live.first, forcePreviewOnly: true);
     }
