@@ -295,8 +295,8 @@ class SharedStreamEngine extends ChangeNotifier {
     controller = newController;
 
     try {
-      // TIMEOUT RÍGIDO DE 10 SEGUNDOS: Evita loading infinito na TV Box
-      await newController.initialize().timeout(const Duration(seconds: 10));
+      // TIMEOUT RÍGIDO DE 12 SEGUNDOS: Evita loading infinito na TV Box
+      await newController.initialize().timeout(const Duration(seconds: 12));
       if (currentItem?.id != item.id) return;
 
       if (item.type != ContentType.live && startPosition != null && startPosition.inSeconds > 5) {
