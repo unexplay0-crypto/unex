@@ -166,7 +166,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
     final user = _userCtrl.text.trim();
     final pass = _passCtrl.text.trim();
     if (dns.isEmpty || user.isEmpty || pass.isEmpty) {
-      setState(() { _validating = false; _errorMsg = 'Preencha DNS, Usuário e Senha.'; });
+      setState(() { _validating = false; _errorMsg = 'Preencha DNS, Utilizador e Senha.'; });
       return;
     }
     if (!dns.startsWith('http')) dns = 'http://$dns';
@@ -799,7 +799,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Widget _buildMiniVideo() {
     if (_engine.hasError) return const Center(child: Text('Sinal indisponível', style: TextStyle(fontSize: 11, color: Colors.white54)));
-    if (!_engine.controller?.value.isInitialized ?? true) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
+    if (_engine.controller?.value.isInitialized != true) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
     final c = _engine.controller!;
     return FittedBox(fit: BoxFit.contain, child: SizedBox(width: c.value.size.width, height: c.value.size.height, child: VideoPlayer(c)));
   }
