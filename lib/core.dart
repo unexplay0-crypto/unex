@@ -125,12 +125,13 @@ class SeriesGroup {
 // =============================================================================
 class AppStorage {
   static String get _tmp => Directory.systemTemp.path;
-  static File get _sessionFile => File('$_tmp/unex_verified_session_v8.json');
-  static File get _deviceFile => File('$_tmp/unex_device_mode_v8.json');
-  static File get _vodProgressFile => File('$_tmp/unex_vod_progress_v8.json');
-  static File get _favoritesFile => File('$_tmp/unex_favorites_v8.json');
-  static File get _recentsFile => File('$_tmp/unex_recents_v8.json');
-  static File get _offlinePlaylistFile => File('$_tmp/unex_offline_playlist_v8.json');
+  static File get _sessionFile => File('$_tmp/unex_verified_session_v9.json');
+  static File get _deviceFile => File('$_tmp/unex_device_mode_v9.json');
+  static File get _vodProgressFile => File('$_tmp/unex_vod_progress_v9.json');
+  static File get _favoritesFile => File('$_tmp/unex_favorites_v9.json');
+  static File get _recentsFile => File('$_tmp/unex_recents_v9.json');
+  static File get _offlinePlaylistFile => File('$_tmp/unex_offline_playlist_v9.json');
+  static File get _parentalPinFile => File('$_tmp/unex_parental_pin_v9.txt');
 
   static Future<DeviceMode> getOrDetectDeviceMode() async {
     try {
@@ -149,9 +150,7 @@ class AppStorage {
   }
 
   static Future<Map<String, dynamic>?> loadVerifiedSession() async {
-    try {
-      if (await _sessionFile.exists()) return jsonDecode(await _sessionFile.readAsString());
-    } catch (_) {}
+    try { if (await _sessionFile.exists()) return jsonDecode(await _sessionFile.readAsString()); } catch (_) {}
     return null;
   }
 
@@ -167,6 +166,15 @@ class AppStorage {
     } catch (_) {}
   }
 
+  static Future<String> loadParentalPin() async {
+    try { if (await _parentalPinFile.exists()) return await _parentalPinFile.readAsString(); } catch (_) {}
+    return '0000'; // PIN Padrão
+  }
+
+  static Future<void> saveParentalPin(String pin) async {
+    try { await _parentalPinFile.writeAsString(pin.trim()); } catch (_) {}
+  }
+
   static Future<List<StreamItem>> loadOfflinePlaylist() async {
     try {
       if (await _offlinePlaylistFile.exists()) {
@@ -178,10 +186,7 @@ class AppStorage {
   }
 
   static Future<void> saveOfflinePlaylist(List<StreamItem> items) async {
-    try {
-      final serialized = items.map((e) => e.toJson()).toList();
-      await _offlinePlaylistFile.writeAsString(jsonEncode(serialized));
-    } catch (_) {}
+    try { await _offlinePlaylistFile.writeAsString(jsonEncode(items.map((e) => e.toJson()).toList())); } catch (_) {}
   }
 
   static Future<Set<String>> loadFavorites() async {
@@ -233,7 +238,7 @@ class AppStorage {
 }
 
 // =============================================================================
-// MOTOR DE VÍDEO COMPARTILHADO (COM TIMEOUT PARA TV E FALLBACK DE CODEC)
+// MOTOR DE VÍDEO COMPARTILHADO (BLINDADO PARA TV BOX)
 // =============================================================================
 class SharedStreamEngine extends ChangeNotifier {
   static final SharedStreamEngine instance = SharedStreamEngine._internal();
@@ -269,19 +274,29 @@ class SharedStreamEngine extends ChangeNotifier {
 
     _fetchMockEpg(item);
 
+    // BLINDAGEM DE HARDWARE DE TV: Destrói o player anterior e libera o decodificador
+    final oldController = controller;
+    controller = null; // Remove a referência da UI imediatamente
+    if (oldController != null) {
+      await oldController.pause().catchError((_) {});
+      await oldController.dispose().catchError((_) {});
+      // Aguarda o Android TV liberar o MediaCodec (Crucial para evitar travamento)
+      await Future.delayed(const Duration(milliseconds: 200)); 
+    }
+
     String targetUrl = item.url;
     if (tryHlsFallback && targetUrl.endsWith('.ts')) {
       targetUrl = '${targetUrl.substring(0, targetUrl.length - 3)}.m3u8';
+    } else if (tryHlsFallback && targetUrl.endsWith('.m3u8')) {
+      targetUrl = '${targetUrl.substring(0, targetUrl.length - 5)}.ts';
     }
 
-    final oldController = controller;
     final newController = VideoPlayerController.networkUrl(Uri.parse(targetUrl), httpHeaders: kIptvHeaders);
     controller = newController;
-    await oldController?.dispose();
 
     try {
-      // Timeout estendido para forçar fallback caso a TV Box trave lendo o .ts nativo
-      await newController.initialize().timeout(const Duration(seconds: 12));
+      // TIMEOUT RÍGIDO DE 10 SEGUNDOS: Evita loading infinito na TV Box
+      await newController.initialize().timeout(const Duration(seconds: 10));
       if (currentItem?.id != item.id) return;
 
       if (item.type != ContentType.live && startPosition != null && startPosition.inSeconds > 5) {
@@ -363,7 +378,6 @@ class SharedStreamEngine extends ChangeNotifier {
     if (controller == null || !isReady) return;
     final target = controller!.value.position + Duration(seconds: seconds);
     
-    // Correção do método .clamp para Duration
     Duration finalTarget = target;
     if (finalTarget < Duration.zero) {
       finalTarget = Duration.zero;
@@ -379,12 +393,16 @@ class SharedStreamEngine extends ChangeNotifier {
   Future<void> stopAndClear() async {
     _saveCurrentVodProgressImmediately(); _watchdogTimer?.cancel();
     final old = controller; controller = null; currentItem = null; isReady = false; hasError = false;
-    notifyListeners(); await old?.dispose();
+    notifyListeners(); 
+    if (old != null) {
+      await old.pause().catchError((_){});
+      await old.dispose().catchError((_){});
+    }
   }
 }
 
 // =============================================================================
-// PARSER M3U OTIMIZADO (COMPUTE BACKGROUND)
+// PARSER M3U OTIMIZADO (COMPUTE BACKGROUND COM FILTRO ADULTO)
 // =============================================================================
 List<StreamItem> parseM3UAdvanced(String raw) {
   final List<StreamItem> result = [];
@@ -426,12 +444,15 @@ List<StreamItem> parseM3UAdvanced(String raw) {
         extractedSeriesName = name.substring(0, seMatch.start).replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
       }
 
+      // Detecção de Conteúdo Adulto Robusta
+      final isAdult = lowerGroup.contains('adult') || lowerGroup.contains('+18') || lowerGroup.contains('xxx') || name.toLowerCase().contains('xxx') || lowerGroup.contains('for adult');
+
       result.add(StreamItem(
         id: '${counter}_${trimmed.hashCode}', streamId: '', tvgId: tvgId,
         name: name, cleanName: cleanName, seriesName: extractedSeriesName,
         seasonNumber: seasonNum, episodeNumber: episodeNum, qualityTag: quality,
         group: group, logo: logo, url: trimmed, type: type,
-        isAdult: lowerGroup.contains('adult') || lowerGroup.contains('+18') || name.toLowerCase().contains('xxx'),
+        isAdult: isAdult,
       ));
       name = ''; group = 'Geral'; logo = ''; tvgId = '';
     }
