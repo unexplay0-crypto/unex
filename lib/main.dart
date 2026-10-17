@@ -103,7 +103,7 @@ class _BootRouterScreenState extends State<BootRouterScreen> {
 }
 
 // =============================================================================
-// LOGIN INTELIGENTE COM SUPORTE AO TECLADO NATIVO DA TV
+// LOGIN INTELIGENTE (SEM TECLADO NATIVO NA TV!)
 // =============================================================================
 class LoginGatewayScreen extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -149,7 +149,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
   }
 
   Future<void> _submitLogin() async {
-    FocusScope.of(context).unfocus(); // Oculta o teclado nativo
+    FocusScope.of(context).unfocus(); // Oculta teclados de telemóvel, caso existam
     setState(() { _validating = true; _errorMsg = null; });
 
     if (_directM3u) {
@@ -273,7 +273,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                       ],
                       const SizedBox(height: 16),
                       if (!_directM3u) ...[
-                        _buildInput('URL / DNS do Servidor', 'http://servidor.club', _dnsCtrl, Icons.dns_rounded),
+                        _buildInput('URL / DNS do Servidor', 'Ex: http://servidor.club', _dnsCtrl, Icons.dns_rounded),
                         _buildInput('Utilizador', 'O seu utilizador', _userCtrl, Icons.person_outline),
                         _buildInput('Senha', 'A sua senha', _passCtrl, Icons.lock_outline, obscure: true),
                       ] else ...[
@@ -328,24 +328,74 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
     );
   }
 
-  // Campo de Entrada compatível com Teclado Nativo da Android TV
+  // ===========================================================================
+  // MÁGICA DO TECLADO: Native no Mobile / Falso Botão (Visor Espelhado) na TV
+  // ===========================================================================
   Widget _buildInput(String label, String hint, TextEditingController ctrl, IconData icon, {bool obscure = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: ctrl,
-        obscureText: obscure,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixIcon: Icon(icon, color: const Color(0xFF00E5FF)),
-          filled: true,
-          fillColor: const Color(0xFF080A10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2)),
+    // Se for telemóvel, usamos o TextField nativo para o utilizador escrever com os dedos
+    if (_mode == DeviceMode.mobile) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: ctrl,
+          obscureText: obscure,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            labelText: label, hintText: hint, prefixIcon: Icon(icon, color: const Color(0xFF00E5FF)),
+            filled: true, fillColor: const Color(0xFF080A10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2)),
+          ),
         ),
-      ),
+      );
+    }
+    
+    // Se for TV, NUNCA renderiza um TextField. Cria um botão que finge ser uma caixa de texto.
+    // Assim o teclado Android NUNCA é chamado, e as setas do comando continuam a funcionar.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: ctrl,
+      builder: (context, val, _) {
+        final txt = val.text.isEmpty ? hint : (obscure ? '•' * val.text.length : val.text);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TVFocusableItem(
+            autoScroll: false,
+            onSelect: () {
+              // Quando o cliente clica OK, chama o NOSSO teclado virtual (criado em widgets.dart)
+              showTVVirtualKeyboard(context, ctrl, label, isPassword: obscure);
+            },
+            builder: (c, f) => AnimatedScale(
+              scale: f ? 1.05 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF080A10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.white12, width: f ? 2 : 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: f ? Colors.white : const Color(0xFF00E5FF), size: 22),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start, 
+                        children: [
+                          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text(txt, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: val.text.isEmpty ? Colors.white38 : Colors.white)),
+                        ],
+                      ),
+                    ),
+                    const Text('OK', style: TextStyle(fontSize: 12, color: Color(0xFF00E5FF), fontWeight: FontWeight.w900)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -382,7 +432,6 @@ class _MainDashboardState extends State<MainDashboard> {
   bool isTVSideMenuOpen = false;
   bool isLoading = true;
   String errorMessage = '';
-  bool _adultUnlocked = false; // Estado Global do PIN no Mobile
 
   List<StreamItem> allItems = [], liveItems = [], movieItems = [], seriesItems = [];
   List<SeriesGroup> allSeriesGroups = [], displayedSeries = [];
@@ -601,12 +650,6 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
-    if (item.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) setState(() => _adultUnlocked = true);
-      else return;
-    }
-
     _recordRecent(item);
     Duration? startPos;
     final saved = vodProgressMap[item.id];
@@ -626,19 +669,7 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  void _handlePreviewOrPlay(StreamItem item) async {
-    if (item.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) {
-        setState(() => _adultUnlocked = true);
-        _proceedPreviewOrPlay(item);
-      }
-      return;
-    }
-    _proceedPreviewOrPlay(item);
-  }
-
-  void _proceedPreviewOrPlay(StreamItem item) {
+  void _handlePreviewOrPlay(StreamItem item) {
     _recordRecent(item);
     if (_engine.currentItem?.id == item.id && _engine.isReady) {
       if (item.type == ContentType.movie) {
@@ -696,16 +727,7 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  void _openSeriesEpisodesModal(SeriesGroup series) async {
-    if (series.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) {
-        setState(() => _adultUnlocked = true);
-      } else {
-        return;
-      }
-    }
-
+  void _openSeriesEpisodesModal(SeriesGroup series) {
     final seasons = series.seasons.keys.toList()..sort();
     int selSeason = seasons.isNotEmpty ? seasons.first : 1;
     final flatList = series.allEpisodesFlat;
