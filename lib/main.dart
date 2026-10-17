@@ -55,7 +55,7 @@ class UnexVisionApp extends StatelessWidget {
 }
 
 // =============================================================================
-// 1. BOOT AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + SESSÃO SALVA)
+// BOOT AUTOMÁTICO (AUTO-DETEÇÃO DE APARELHO + SESSÃO SALVA)
 // =============================================================================
 class BootRouterScreen extends StatefulWidget {
   const BootRouterScreen({super.key});
@@ -103,7 +103,7 @@ class _BootRouterScreenState extends State<BootRouterScreen> {
 }
 
 // =============================================================================
-// 2. LOGIN INTELIGENTE + BLOQUEIO DE VENCIMENTO + TECLADO DE TV COMPACTO
+// LOGIN INTELIGENTE + BLOQUEIO DE VENCIMENTO + TECLADO DE TV COMPACTO
 // =============================================================================
 class LoginGatewayScreen extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -185,7 +185,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
           if (status == 'expired' || status == 'banned' || (expRaw != null && expRaw > 0 && expRaw < nowSec)) {
             setState(() {
               _validating = false;
-              _errorMsg = 'Sua assinatura está vencida. Entre em contato com seu provedor para renovar.';
+              _errorMsg = 'A sua subscrição expirou. Entre em contacto com o seu fornecedor.';
             });
             return;
           }
@@ -237,7 +237,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(isTV ? '📺 Modo TV Android' : '📱 Modo Celular',
+                          Text(isTV ? '📺 Modo TV Android' : '📱 Modo Telemóvel',
                               style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
                           TVFocusableItem(
                             autoScroll: false,
@@ -256,7 +256,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                       const SizedBox(height: 12),
                       const Text('UNEX VISION', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.8)),
                       const SizedBox(height: 4),
-                      Text(_directM3u ? 'Insira o link M3U Plus da lista' : 'Informe os dados de acesso da sua conta',
+                      Text(_directM3u ? 'Insira o link M3U Plus da lista' : 'Insira os dados de acesso da sua conta',
                           style: const TextStyle(fontSize: 11, color: Colors.white54)),
                       if (_errorMsg != null) ...[
                         const SizedBox(height: 12),
@@ -274,9 +274,9 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                       if (!_directM3u) ...[
                         _buildInput('URL / DNS do Servidor', 'http://servidor.club', _dnsCtrl, Icons.dns_rounded),
                         const SizedBox(height: 10),
-                        _buildInput('Usuário', 'Seu usuário', _userCtrl, Icons.person_outline),
+                        _buildInput('Utilizador', 'O seu utilizador', _userCtrl, Icons.person_outline),
                         const SizedBox(height: 10),
-                        _buildInput('Senha', 'Sua senha', _passCtrl, Icons.lock_outline, obscure: true),
+                        _buildInput('Senha', 'A sua senha', _passCtrl, Icons.lock_outline, obscure: true),
                       ] else ...[
                         _buildInput('Link M3U Completo', 'http://.../get.php?...', _m3uCtrl, Icons.link_rounded),
                       ],
@@ -297,7 +297,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                                 border: Border.all(color: f ? Colors.white : Colors.transparent, width: 2),
                               ),
                               child: const Center(
-                                child: Text('CONECTAR AGORA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                                child: Text('LIGAR AGORA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
                               ),
                             ),
                           ),
@@ -313,7 +313,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                             border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.transparent),
                           ),
                           child: Text(
-                            _directM3u ? 'Usar DNS, Usuário e Senha' : 'Usar Link M3U Direto',
+                            _directM3u ? 'Usar DNS, Utilizador e Senha' : 'Usar Link M3U Direto',
                             style: const TextStyle(fontSize: 11, color: Colors.white54),
                           ),
                         ),
@@ -376,7 +376,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
 }
 
 // =============================================================================
-// 3. PAINEL PRINCIPAL OFFLINE-FIRST (<1s) + SINCRONIZAÇÃO EM SEGUNDO PLANO + OTA
+// PAINEL PRINCIPAL OFFLINE-FIRST (<1s) + SINCRONIZAÇÃO EM SEGUNDO PLANO + OTA
 // =============================================================================
 class MainDashboard extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -485,7 +485,7 @@ class _MainDashboardState extends State<MainDashboard> {
       }
     } catch (_) {
       if (cached.isEmpty && mounted) {
-        setState(() { isLoading = false; errorMessage = 'Erro de conexão com o servidor.'; });
+        setState(() { isLoading = false; errorMessage = 'Erro de ligação na TV: Verifique a internet e o DNS.'; });
       }
     }
   }
@@ -526,7 +526,7 @@ class _MainDashboardState extends State<MainDashboard> {
             builder: (ctx) => AlertDialog(
               backgroundColor: const Color(0xFF121622),
               title: Text('Nova Versão Disponível ($latest)'),
-              content: Text(data['notes']?.toString() ?? 'Uma nova atualização otimizada está pronta para download.'),
+              content: Text(data['notes']?.toString() ?? 'Uma nova atualização otimizada está pronta para transferência.'),
               actions: [
                 TVFocusableItem(
                   autofocus: true,
@@ -542,7 +542,7 @@ class _MainDashboardState extends State<MainDashboard> {
                 ),
                 TVFocusableItem(
                   onSelect: () => Navigator.pop(ctx),
-                  builder: (c, f) => const Padding(padding: EdgeInsets.all(10), child: Text('Depois')),
+                  builder: (c, f) => const Padding(padding: EdgeInsets.all(10), child: Text('Mais tarde')),
                 ),
               ],
             ),
@@ -568,9 +568,9 @@ class _MainDashboardState extends State<MainDashboard> {
       case MainSection.live: return 'TV ao Vivo';
       case MainSection.movie: return 'Filmes';
       case MainSection.series: return 'Séries';
-      case MainSection.continueWatching: return 'Continuar Assistindo';
-      case MainSection.favorites: return 'Meus Favoritos';
-      case MainSection.recents: return 'Assistidos Recentemente';
+      case MainSection.continueWatching: return 'Continuar a Ver';
+      case MainSection.favorites: return 'Os Meus Favoritos';
+      case MainSection.recents: return 'Vistos Recentemente';
     }
   }
 
@@ -675,7 +675,7 @@ class _MainDashboardState extends State<MainDashboard> {
           Text(
             item.synopsis != 'Nenhuma sinopse disponível.'
                 ? item.synopsis
-                : 'Conteúdo sob demanda otimizado em alta definição (${item.qualityTag}) do catálogo ${item.group}.',
+                : 'Conteúdo on-demand otimizado em alta definição (${item.qualityTag}) do catálogo ${item.group}.',
             style: const TextStyle(fontSize: 13, color: Colors.white70),
           ),
         ]),
@@ -686,7 +686,7 @@ class _MainDashboardState extends State<MainDashboard> {
             builder: (c, f) => Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(color: const Color(0xFF00E5FF), borderRadius: BorderRadius.circular(8), border: Border.all(color: f ? Colors.white : Colors.transparent, width: 2)),
-              child: const Text('▶ Assistir Agora', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+              child: const Text('▶ Ver Agora', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
             ),
           ),
           TVFocusableItem(
@@ -694,7 +694,7 @@ class _MainDashboardState extends State<MainDashboard> {
             builder: (c, f) => Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.white24), borderRadius: BorderRadius.circular(8)),
-              child: Text(favoriteIds.contains(item.id) ? '★ Remover Favorito' : '☆ Favoritar'),
+              child: Text(favoriteIds.contains(item.id) ? '★ Remover Favorito' : '☆ Adicionar aos Favoritos'),
             ),
           ),
         ],
@@ -799,7 +799,7 @@ class _MainDashboardState extends State<MainDashboard> {
 
   Widget _buildMiniVideo() {
     if (_engine.hasError) return const Center(child: Text('Sinal indisponível', style: TextStyle(fontSize: 11, color: Colors.white54)));
-    if (!_engine.isReady || _engine.controller == null) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
+    if (!_engine.controller?.value.isInitialized ?? true) return const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)));
     final c = _engine.controller!;
     return FittedBox(fit: BoxFit.contain, child: SizedBox(width: c.value.size.width, height: c.value.size.height, child: VideoPlayer(c)));
   }
@@ -865,7 +865,7 @@ class _MainDashboardState extends State<MainDashboard> {
                                 color: f ? Colors.white : const Color(0xFF00E5FF),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Text('Corrigir Dados no Login', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                              child: const Text('Corrigir Dados de Acesso', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
