@@ -39,7 +39,6 @@ class StreamItem {
   final ContentType type;
   final bool isAdult;
   
-  // Novos Metadados VOD
   final String synopsis;
   final String rating;
   final String year;
@@ -122,7 +121,7 @@ class SeriesGroup {
 }
 
 // =============================================================================
-// ARMAZENAMENTO OFFLINE-FIRST (PERSISTÊNCIA DEFINITIVA NO DISCO)
+// ARMAZENAMENTO OFFLINE-FIRST E PERSISTÊNCIA NO DISCO
 // =============================================================================
 class AppStorage {
   static String get _tmp => Directory.systemTemp.path;
@@ -133,7 +132,6 @@ class AppStorage {
   static File get _recentsFile => File('$_tmp/unex_recents_v8.json');
   static File get _offlinePlaylistFile => File('$_tmp/unex_offline_playlist_v8.json');
 
-  // Auto-Detecção nativa + Preferência salva
   static Future<DeviceMode> getOrDetectDeviceMode() async {
     try {
       if (await _deviceFile.exists()) {
@@ -169,7 +167,6 @@ class AppStorage {
     } catch (_) {}
   }
 
-  // Cache Offline da Lista
   static Future<List<StreamItem>> loadOfflinePlaylist() async {
     try {
       if (await _offlinePlaylistFile.exists()) {
@@ -187,7 +184,6 @@ class AppStorage {
     } catch (_) {}
   }
 
-  // Persistência de Favoritos e Recentes
   static Future<Set<String>> loadFavorites() async {
     try {
       if (await _favoritesFile.exists()) {
@@ -237,7 +233,7 @@ class AppStorage {
 }
 
 // =============================================================================
-// MOTOR DE VÍDEO COMPARTILHADO (COM FALLBACK E ANTI-TRAVAMENTO)
+// MOTOR DE VÍDEO COMPARTILHADO (COM TIMEOUT PARA TV E FALLBACK DE CODEC)
 // =============================================================================
 class SharedStreamEngine extends ChangeNotifier {
   static final SharedStreamEngine instance = SharedStreamEngine._internal();
@@ -250,7 +246,6 @@ class SharedStreamEngine extends ChangeNotifier {
   bool isReady = false;
   bool hasError = false;
   bool isRecovering = false;
-  double measuredSpeedMbps = 18.5;
 
   Timer? _watchdogTimer;
   Duration _lastPosition = Duration.zero;
@@ -272,9 +267,8 @@ class SharedStreamEngine extends ChangeNotifier {
     if (!tryHlsFallback) _recoveryAttempts = 0;
     notifyListeners();
 
-    _fetchMockEpg(item); // EPG Simulado para manter leveza
+    _fetchMockEpg(item);
 
-    // Fallback de Codec: Se HLS Fallback falhar, tenta outra variante
     String targetUrl = item.url;
     if (tryHlsFallback && targetUrl.endsWith('.ts')) {
       targetUrl = '${targetUrl.substring(0, targetUrl.length - 3)}.m3u8';
@@ -286,7 +280,8 @@ class SharedStreamEngine extends ChangeNotifier {
     await oldController?.dispose();
 
     try {
-      await newController.initialize();
+      // Timeout estendido para forçar fallback caso a TV Box trave lendo o .ts nativo
+      await newController.initialize().timeout(const Duration(seconds: 12));
       if (currentItem?.id != item.id) return;
 
       if (item.type != ContentType.live && startPosition != null && startPosition.inSeconds > 5) {
@@ -367,14 +362,16 @@ class SharedStreamEngine extends ChangeNotifier {
   Future<void> seekRelative(int seconds) async {
     if (controller == null || !isReady) return;
     final target = controller!.value.position + Duration(seconds: seconds);
-        Duration finalTarget = target;
+    
+    // Correção do método .clamp para Duration
+    Duration finalTarget = target;
     if (finalTarget < Duration.zero) {
       finalTarget = Duration.zero;
     } else if (finalTarget > controller!.value.duration) {
       finalTarget = controller!.value.duration;
     }
+    
     await controller!.seekTo(finalTarget);
-
     _saveCurrentVodProgressImmediately();
     notifyListeners();
   }
@@ -434,7 +431,7 @@ List<StreamItem> parseM3UAdvanced(String raw) {
         name: name, cleanName: cleanName, seriesName: extractedSeriesName,
         seasonNumber: seasonNum, episodeNumber: episodeNum, qualityTag: quality,
         group: group, logo: logo, url: trimmed, type: type,
-        isAdult: lowerGroup.contains('adult') || lowerGroup.contains('+18'),
+        isAdult: lowerGroup.contains('adult') || lowerGroup.contains('+18') || name.toLowerCase().contains('xxx'),
       ));
       name = ''; group = 'Geral'; logo = ''; tvgId = '';
     }
