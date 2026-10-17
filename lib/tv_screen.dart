@@ -71,7 +71,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
   }
 
   // ===========================================================================
-  // INTERCEPTADORES DE CONTROLE PARENTAL (+18)
+  // INTERCETTORES DE CONTROLO PARENTAL (+18)
   // ===========================================================================
   Future<void> _handlePreview(StreamItem item) async {
     if (item.isAdult && !_adultUnlocked) {
@@ -136,7 +136,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
   }
 
   // ===========================================================================
-  // LAYOUT 3 COLUNAS: TV AO VIVO (VERTU PLAY STYLE)
+  // LAYOUT 3 COLUNAS: TV AO VIVO (ESTILO VERTU PLAY)
   // ===========================================================================
   Widget _buildLiveTVLayout() {
     return Row(
@@ -164,7 +164,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                       onMoveLeft: _focusSideMenuNow,
                       onSelect: () {
                         // Se a categoria for adulta, pede a senha logo ao tentar abrir
-                        final isAdultCat = cat.toLowerCase().contains('adult') || cat.toLowerCase().contains('+18');
+                        final isAdultCat = cat.toLowerCase().contains('adult') || cat.toLowerCase().contains('+18') || cat.toLowerCase().contains('xxx');
                         if (isAdultCat && !_adultUnlocked) {
                           showParentalPinPrompt(context).then((unlocked) {
                             if (unlocked && mounted) {
@@ -334,7 +334,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
   }
 
   // ===========================================================================
-  // LAYOUT IMERSIVO: FILMES E SÉRIES (NETFLIX / MAX STYLE)
+  // LAYOUT IMERSIVO: FILMES E SÉRIES (ESTILO NETFLIX / MAX)
   // ===========================================================================
   Widget _buildImmersiveVodLayout() {
     final isSeries = widget.activeSection == MainSection.series;
@@ -346,14 +346,14 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 1. BACKGROUND OTIMIZADO DE ALTA PERFORMANCE (SEM BLUR)
+        // 1. BACKGROUND OTIMIZADO DE ALTA PERFORMANCE (SEM BLUR, APENAS VIGNETTE)
         if (bgUrl != null && bgUrl.isNotEmpty)
           Positioned(
             top: 0, left: 0, right: 0, height: MediaQuery.of(context).size.height * 0.75,
             child: Image.network(bgUrl, fit: BoxFit.cover, alignment: Alignment.topCenter, cacheWidth: 800, errorBuilder: (_,__,___) => Container(color: _bgColor)),
           ),
         
-        // Vignette (Gradiente Escuro) para leitura perfeita dos textos
+        // Gradiente Escuro para leitura perfeita dos textos
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -459,8 +459,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
         _buildNav('Filmes', MainSection.movie, Icons.movie_creation_rounded),
         _buildNav('Séries', MainSection.series, Icons.video_library_rounded),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(color: Colors.white10)),
-        _buildNav('Continuar', MainSection.continueWatching, Icons.play_circle_filled_rounded),
-        _buildNav('Favoritos', MainSection.favorites, Icons.star_rounded),
+        _buildNav('Continuar a Ver', MainSection.continueWatching, Icons.play_circle_filled_rounded),
+        _buildNav('Os Meus Favoritos', MainSection.favorites, Icons.star_rounded),
       ],
     );
   }
