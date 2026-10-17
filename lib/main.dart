@@ -41,7 +41,7 @@ class UnexVisionApp extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.gameButtonA): const ActivateIntent(),
       },
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF08090E),
+        scaffoldBackgroundColor: const Color(0xFF090B10),
         primaryColor: const Color(0xFF00E5FF),
         colorScheme: const ColorScheme.dark(
           primary: Color(0xFF00E5FF),
@@ -103,7 +103,7 @@ class _BootRouterScreenState extends State<BootRouterScreen> {
 }
 
 // =============================================================================
-// LOGIN INTELIGENTE + BLOQUEIO DE VENCIMENTO + TECLADO DE TV COMPACTO
+// LOGIN INTELIGENTE COM SUPORTE AO TECLADO NATIVO DA TV
 // =============================================================================
 class LoginGatewayScreen extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -149,12 +149,13 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
   }
 
   Future<void> _submitLogin() async {
+    FocusScope.of(context).unfocus(); // Oculta o teclado nativo
     setState(() { _validating = true; _errorMsg = null; });
 
     if (_directM3u) {
       String url = _m3uCtrl.text.trim();
       if (url.isEmpty) {
-        setState(() { _validating = false; _errorMsg = 'Informe o link M3U completo.'; });
+        setState(() { _validating = false; _errorMsg = 'Insira o link M3U completo.'; });
         return;
       }
       if (!url.startsWith('http')) url = 'http://$url';
@@ -216,7 +217,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: RadialGradient(center: Alignment.topRight, radius: 1.4, colors: [Color(0xFF132238), Color(0xFF08090E)]),
+          gradient: RadialGradient(center: Alignment.topRight, radius: 1.4, colors: [Color(0xFF132238), Color(0xFF090B10)]),
         ),
         child: SafeArea(
           child: Center(
@@ -225,7 +226,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 450),
                 child: Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     color: const Color(0xFF12151F).withOpacity(0.95),
                     borderRadius: BorderRadius.circular(22),
@@ -254,10 +255,10 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const Text('UNEX VISION', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.8)),
+                      const Text('UNEX VISION', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.8)),
                       const SizedBox(height: 4),
                       Text(_directM3u ? 'Insira o link M3U Plus da lista' : 'Insira os dados de acesso da sua conta',
-                          style: const TextStyle(fontSize: 11, color: Colors.white54)),
+                          style: const TextStyle(fontSize: 12, color: Colors.white54)),
                       if (_errorMsg != null) ...[
                         const SizedBox(height: 12),
                         Container(
@@ -273,14 +274,12 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                       const SizedBox(height: 16),
                       if (!_directM3u) ...[
                         _buildInput('URL / DNS do Servidor', 'http://servidor.club', _dnsCtrl, Icons.dns_rounded),
-                        const SizedBox(height: 10),
                         _buildInput('Utilizador', 'O seu utilizador', _userCtrl, Icons.person_outline),
-                        const SizedBox(height: 10),
                         _buildInput('Senha', 'A sua senha', _passCtrl, Icons.lock_outline, obscure: true),
                       ] else ...[
                         _buildInput('Link M3U Completo', 'http://.../get.php?...', _m3uCtrl, Icons.link_rounded),
                       ],
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 12),
                       if (_validating)
                         const CircularProgressIndicator(color: Color(0xFF00E5FF))
                       else
@@ -290,14 +289,14 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                             autoScroll: false,
                             onSelect: _submitLogin,
                             builder: (c, f) => Container(
-                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF2979FF)]),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: f ? Colors.white : Colors.transparent, width: 2),
                               ),
                               child: const Center(
-                                child: Text('LIGAR AGORA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                                child: Text('LIGAR AGORA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                               ),
                             ),
                           ),
@@ -307,14 +306,14 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
                         autoScroll: false,
                         onSelect: () => setState(() => _directM3u = !_directM3u),
                         builder: (c, f) => Container(
-                          padding: const EdgeInsets.all(6),
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.transparent),
                           ),
                           child: Text(
                             _directM3u ? 'Usar DNS, Utilizador e Senha' : 'Usar Link M3U Direto',
-                            style: const TextStyle(fontSize: 11, color: Colors.white54),
+                            style: const TextStyle(fontSize: 12, color: Colors.white54),
                           ),
                         ),
                       ),
@@ -329,54 +328,30 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
     );
   }
 
+  // Campo de Entrada compatível com Teclado Nativo da Android TV
   Widget _buildInput(String label, String hint, TextEditingController ctrl, IconData icon, {bool obscure = false}) {
-    if (_mode == DeviceMode.mobile) {
-      return TextField(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
         controller: ctrl,
         obscureText: obscure,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
         decoration: InputDecoration(
-          labelText: label, hintText: hint, prefixIcon: Icon(icon, color: const Color(0xFF00E5FF)),
-          filled: true, fillColor: const Color(0xFF08090E),
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon, color: const Color(0xFF00E5FF)),
+          filled: true,
+          fillColor: const Color(0xFF080A10),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2)),
         ),
-      );
-    }
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: ctrl,
-      builder: (context, val, _) {
-        final txt = val.text.isEmpty ? hint : (obscure ? '•' * val.text.length : val.text);
-        return TVFocusableItem(
-          autoScroll: false,
-          onSelect: () => _openCompactTVKeyboard(context, ctrl, label),
-          builder: (c, f) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF08090E),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.white12, width: f ? 2 : 1),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: const Color(0xFF00E5FF), size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
-                    Text(txt, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: val.text.isEmpty ? Colors.white38 : Colors.white)),
-                  ]),
-                ),
-                const Text('OK', style: TextStyle(fontSize: 10, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-        );
-      },
+      ),
     );
   }
 }
 
 // =============================================================================
-// PAINEL PRINCIPAL OFFLINE-FIRST (<1s) + SINCRONIZAÇÃO EM SEGUNDO PLANO + OTA
+// PAINEL PRINCIPAL OFFLINE-FIRST + SINCRONIZAÇÃO EM SEGUNDO PLANO + OTA
 // =============================================================================
 class MainDashboard extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -407,6 +382,7 @@ class _MainDashboardState extends State<MainDashboard> {
   bool isTVSideMenuOpen = false;
   bool isLoading = true;
   String errorMessage = '';
+  bool _adultUnlocked = false; // Estado Global do PIN no Mobile
 
   List<StreamItem> allItems = [], liveItems = [], movieItems = [], seriesItems = [];
   List<SeriesGroup> allSeriesGroups = [], displayedSeries = [];
@@ -625,6 +601,12 @@ class _MainDashboardState extends State<MainDashboard> {
   }
 
   Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
+    if (item.isAdult && !_adultUnlocked) {
+      final unlocked = await showParentalPinPrompt(context);
+      if (unlocked && mounted) setState(() => _adultUnlocked = true);
+      else return;
+    }
+
     _recordRecent(item);
     Duration? startPos;
     final saved = vodProgressMap[item.id];
@@ -644,7 +626,19 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  void _handlePreviewOrPlay(StreamItem item) {
+  void _handlePreviewOrPlay(StreamItem item) async {
+    if (item.isAdult && !_adultUnlocked) {
+      final unlocked = await showParentalPinPrompt(context);
+      if (unlocked && mounted) {
+        setState(() => _adultUnlocked = true);
+        _proceedPreviewOrPlay(item);
+      }
+      return;
+    }
+    _proceedPreviewOrPlay(item);
+  }
+
+  void _proceedPreviewOrPlay(StreamItem item) {
     _recordRecent(item);
     if (_engine.currentItem?.id == item.id && _engine.isReady) {
       if (item.type == ContentType.movie) {
@@ -702,7 +696,16 @@ class _MainDashboardState extends State<MainDashboard> {
     );
   }
 
-  void _openSeriesEpisodesModal(SeriesGroup series) {
+  void _openSeriesEpisodesModal(SeriesGroup series) async {
+    if (series.isAdult && !_adultUnlocked) {
+      final unlocked = await showParentalPinPrompt(context);
+      if (unlocked && mounted) {
+        setState(() => _adultUnlocked = true);
+      } else {
+        return;
+      }
+    }
+
     final seasons = series.seasons.keys.toList()..sort();
     int selSeason = seasons.isNotEmpty ? seasons.first : 1;
     final flatList = series.allEpisodesFlat;
@@ -899,84 +902,4 @@ class _MainDashboardState extends State<MainDashboard> {
       ),
     );
   }
-}
-
-Future<void> _openCompactTVKeyboard(BuildContext context, TextEditingController ctrl, String title) async {
-  const rows = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-  const webKeys = ['http://', 'https://', '.club', '.com', '.net', ':8080', '/', ':', '.', '-', '_', '?', '=', '&'];
-  bool showWeb = false;
-
-  await showDialog(
-    context: context,
-    barrierColor: Colors.black26,
-    builder: (ctx) => StatefulBuilder(
-      builder: (context, setModal) => Align(
-        alignment: Alignment.bottomCenter,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            width: 680,
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B0E17).withOpacity(0.96),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF00E5FF)),
-            ),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Row(children: [
-                Text('$title: ', style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold)),
-                Expanded(child: Text('${ctrl.text}▌', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-                TVFocusableItem(
-                  autoScroll: false,
-                  onSelect: () => Navigator.pop(ctx),
-                  builder: (c, f) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFF00E5FF), borderRadius: BorderRadius.circular(6)),
-                    child: const Text('OK', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 8),
-              if (showWeb)
-                Wrap(
-                  spacing: 6, runSpacing: 6,
-                  children: webKeys.map((k) => _keyBtn(k, () => setModal(() => ctrl.text += k))).toList(),
-                )
-              else
-                ...rows.map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Wrap(spacing: 5, children: r.split('').map((ch) => _keyBtn(ch, () => setModal(() => ctrl.text += ch), w: 42)).toList()),
-                )),
-              const SizedBox(height: 6),
-              Wrap(spacing: 6, children: [
-                _keyBtn(showWeb ? '⌨ QWERTY' : '🌐 Atalhos Web', () => setModal(() => showWeb = !showWeb)),
-                _keyBtn('ESPAÇO', () => setModal(() => ctrl.text += ' '), w: 95),
-                _keyBtn('⌫ Apagar', () => setModal(() { if (ctrl.text.isNotEmpty) ctrl.text = ctrl.text.substring(0, ctrl.text.length - 1); })),
-                _keyBtn('Limpar', () => setModal(() => ctrl.clear())),
-              ]),
-            ]),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _keyBtn(String label, VoidCallback onTap, {double? w}) {
-  return TVFocusableItem(
-    autoScroll: false,
-    onSelect: onTap,
-    builder: (c, f) => Container(
-      width: w,
-      padding: EdgeInsets.symmetric(horizontal: w == null ? 10 : 0, vertical: 7),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: f ? const Color(0xFF00E5FF) : const Color(0xFF181C28),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: f ? Colors.white : Colors.white12),
-      ),
-      child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: f ? Colors.black : Colors.white)),
-    ),
-  );
 }
