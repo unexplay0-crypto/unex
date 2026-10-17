@@ -402,7 +402,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              border: const BorderSide(color: Color(0xFF00E5FF), width: 2),
+              borderSide: const BorderSide(color: Color(0xFF00E5FF), width: 2),
             ),
           ),
         ),
@@ -613,7 +613,6 @@ class _MainDashboardState extends State<MainDashboard> {
         if (mounted) {
           await _applyCatalog(bundle.allItems, bundle.seriesGroups, startFirstChannel: cached.isEmpty);
         }
-        // Salva cache em background após 4 segundos sem travar a reprodução do vídeo inicial
         Future.delayed(const Duration(seconds: 4), () {
           AppStorage.saveOfflinePlaylist(bundle.allItems);
         });
@@ -675,7 +674,9 @@ class _MainDashboardState extends State<MainDashboard> {
         series.add(i);
       }
     }
-    final grouped = preGroupedSeries ?? await compute(groupSeriesItems, series);
+    final List<SeriesGroup> grouped = preGroupedSeries != null
+        ? preGroupedSeries
+        : await compute(groupSeriesItems, series);
     if (!mounted) return;
     setState(() {
       allItems = items;
