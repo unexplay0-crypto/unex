@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'core.dart';
 
 // =============================================================================
-// COMPONENTES OTIMIZADOS E CONTROLES DE TV (10-FOOT UI)
+// COMPONENTES OTIMIZADOS E CONTROLOS DE TV (10-FOOT UI)
 // =============================================================================
 
 class TVFocusableItem extends StatefulWidget {
@@ -133,8 +133,7 @@ class TVIconButton extends StatelessWidget {
 }
 
 // =============================================================================
-// NOVO TECLADO VIRTUAL DE TV (FOCO SEMPRE NO 'Q', HTTP:// E '.' NA ÚLTIMA FILEIRA,
-// E APENAS 3 BOTÕES IGUAIS NA BASE: MAIÚSCULA, ESPAÇO E APAGAR)
+// NOVO TECLADO VIRTUAL DE TV (FOCO NO 'Q', 3 BOTÕES NA BASE, ATALHOS INTEGRADOS)
 // =============================================================================
 Future<void> showTVVirtualKeyboard(
   BuildContext context,
@@ -146,7 +145,6 @@ Future<void> showTVVirtualKeyboard(
   const row1 = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
   const row2 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
   const row3 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
-  // Última fileira integrando 'http://' e '.' diretamente junto às letras
   const row4 = ['z', 'x', 'c', 'v', 'b', 'n', 'm', 'http://', '.'];
 
   bool isUpper = false;
@@ -160,7 +158,7 @@ Future<void> showTVVirtualKeyboard(
     });
   }
 
-  // Garante foco imediato na tecla 'q' ao abrir o teclado
+  // Garante foco imediato na tecla 'Q/q' ao abrir o teclado
   focusQKey();
 
   await showDialog(
@@ -169,7 +167,7 @@ Future<void> showTVVirtualKeyboard(
     builder: (ctx) => StatefulBuilder(
       builder: (context, setModal) {
         final displayText = ctrl.text.isEmpty
-            ? 'Digite usando o controle...'
+            ? 'Use as setas para escrever...'
             : (isPassword ? '•' * ctrl.text.length : ctrl.text);
 
         void insertText(String value) {
@@ -193,8 +191,8 @@ Future<void> showTVVirtualKeyboard(
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: 680,
-              margin: const EdgeInsets.only(bottom: 18, left: 16, right: 16),
+              width: 700,
+              margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFF0A0C12).withOpacity(0.98),
@@ -265,7 +263,7 @@ Future<void> showTVVirtualKeyboard(
                             ),
                           ),
                           child: const Text(
-                            'OK',
+                            'CONCLUÍR',
                             style: TextStyle(
                               color: Colors.black,
                               fontWeight: FontWeight.w900,
@@ -278,20 +276,20 @@ Future<void> showTVVirtualKeyboard(
                   ),
                   const SizedBox(height: 14),
 
-                  // 2. FILEIRA 1: NÚMEROS
+                  // 2. GRELHA DE TECLAS: LINHA 1 (Números)
                   Wrap(
                     spacing: 6,
                     children: row1
                         .map((k) => _buildKeyBtn(
                               label: k,
-                              width: 54,
+                              width: 56,
                               onTap: () => insertText(k),
                             ))
                         .toList(),
                   ),
                   const SizedBox(height: 6),
 
-                  // 3. FILEIRA 2: QWERTYUIOP (Com foco automático na letra 'q')
+                  // 3. GRELHA DE TECLAS: LINHA 2 (Foco cravado no Q/q)
                   Wrap(
                     spacing: 6,
                     children: row2.map((k) {
@@ -299,7 +297,7 @@ Future<void> showTVVirtualKeyboard(
                       final label = isUpper ? k.toUpperCase() : k;
                       return _buildKeyBtn(
                         label: label,
-                        width: 54,
+                        width: 56,
                         focusNode: isQ ? qFocusNode : null,
                         autofocus: isQ,
                         onTap: () => insertText(label),
@@ -308,21 +306,21 @@ Future<void> showTVVirtualKeyboard(
                   ),
                   const SizedBox(height: 6),
 
-                  // 4. FILEIRA 3: ASDFGHJKL
+                  // 4. GRELHA DE TECLAS: LINHA 3
                   Wrap(
                     spacing: 6,
                     children: row3.map((k) {
                       final label = isUpper ? k.toUpperCase() : k;
                       return _buildKeyBtn(
                         label: label,
-                        width: 54,
+                        width: 56,
                         onTap: () => insertText(label),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 6),
 
-                  // 5. FILEIRA 4: ZXCVBNM + 'http://' + '.'
+                  // 5. GRELHA DE TECLAS: LINHA 4 (Integra http:// e .)
                   Wrap(
                     spacing: 6,
                     children: row4.map((k) {
@@ -330,7 +328,7 @@ Future<void> showTVVirtualKeyboard(
                       final label = isSpecial ? k : (isUpper ? k.toUpperCase() : k);
                       return _buildKeyBtn(
                         label: label,
-                        width: k == 'http://' ? 92 : 54,
+                        width: k == 'http://' ? 100 : 56,
                         color: isSpecial ? const Color(0xFF1A253B) : const Color(0xFF151124),
                         textColor: isSpecial ? const Color(0xFF00E5FF) : Colors.white,
                         onTap: () => insertText(label),
@@ -339,16 +337,16 @@ Future<void> showTVVirtualKeyboard(
                   ),
                   const SizedBox(height: 12),
 
-                  // 6. BARRA INFERIOR: EXATAMENTE 3 BOTÕES IGUAIS (MAIÚSCULA, ESPAÇO, APAGAR)
+                  // 6. BASE: EXATAMENTE 3 BOTÕES IGUAIS
                   Row(
                     children: [
                       Expanded(
                         child: _buildKeyBtn(
-                          label: isUpper ? '⇧ MAIÚSCULA (ON)' : '⇧ MAIÚSCULA',
+                          label: isUpper ? '⇧ MAIÚSC. (ON)' : '⇧ MAIÚSCULA',
                           color: isUpper ? const Color(0xFF2979FF) : const Color(0xFF181C28),
                           onTap: () {
                             setModal(() => isUpper = !isUpper);
-                            // Ao mudar o estado do teclado, reposiciona na tecla 'q'
+                            // Sempre que muda de layout, recoloca o foco no 'Q'
                             focusQKey();
                           },
                         ),
@@ -401,7 +399,7 @@ Widget _buildKeyBtn({
       duration: const Duration(milliseconds: 90),
       child: Container(
         width: width,
-        height: 40,
+        height: 44,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: f ? const Color(0xFF00E5FF) : color,
@@ -415,7 +413,7 @@ Widget _buildKeyBtn({
           label,
           maxLines: 1,
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.bold,
             color: f ? Colors.black : textColor,
           ),
@@ -426,7 +424,7 @@ Widget _buildKeyBtn({
 }
 
 // =============================================================================
-// MODAIS DE CONTEÚDO (CONTROLE PARENTAL E RETOMADA VOD)
+// MODAL CONTROLO PARENTAL (+18) USANDO O NOSSO TECLADO NATIVO
 // =============================================================================
 Future<bool> showParentalPinPrompt(BuildContext context) async {
   bool unlocked = false;
@@ -460,7 +458,7 @@ Future<bool> showParentalPinPrompt(BuildContext context) async {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Digite o PIN de bloqueio parental (Padrão: 0000):',
+              'Aperte OK para introduzir o PIN de bloqueio parental (Padrão: 0000):',
               style: TextStyle(color: Colors.white70, fontSize: 13),
             ),
             const SizedBox(height: 16),
@@ -468,6 +466,7 @@ Future<bool> showParentalPinPrompt(BuildContext context) async {
               autofocus: true,
               autoScroll: false,
               onSelect: () async {
+                // Chama o nosso teclado em dock invisivelmente
                 await showTVVirtualKeyboard(context, pinCtrl, 'PIN', isPassword: true);
                 setModal(() {});
               },
@@ -552,6 +551,9 @@ Future<bool> showParentalPinPrompt(BuildContext context) async {
   return unlocked;
 }
 
+// =============================================================================
+// CACHE ESTREITO DE IMAGENS P/ TV BOXES
+// =============================================================================
 Widget buildStreamingPosterCard({
   required String title,
   required String subtitle,
@@ -593,7 +595,7 @@ Widget buildStreamingPosterCard({
                 ? Image.network(
                     logoUrl,
                     fit: BoxFit.cover,
-                    cacheWidth: 200,
+                    cacheWidth: 200, // Proteção Anti-OutOfMemory
                     errorBuilder: (_, __, ___) => const Icon(Icons.movie_creation_rounded, color: Color(0xFF00E5FF), size: 40),
                   )
                 : const Icon(Icons.movie_creation_rounded, color: Color(0xFF00E5FF), size: 40),
@@ -703,7 +705,7 @@ Widget buildChannelLogo(String url, {double size = 48}) {
           ? Image.network(
               url,
               fit: BoxFit.contain,
-              cacheWidth: 120,
+              cacheWidth: 120, // Proteção Anti-OutOfMemory
               errorBuilder: (_, __, ___) => const Icon(Icons.live_tv_rounded, color: Color(0xFF00E5FF)),
             )
           : const Icon(Icons.live_tv_rounded, color: Color(0xFF00E5FF)),
