@@ -1,4 +1,4 @@
-name: Build UNEX Vision Release APK
+name: Build UNEX Vision 2.0 Release APK
 
 on:
   push:
@@ -32,7 +32,22 @@ jobs:
           fi
           flutter create --platforms=android .
 
-      - name: Configurar AndroidManifest.xml (TV Leanback + Aceleracao)
+      - name: Configurar Politica de Rede Android (Suporte Total HTTP/HTTPS IPTV)
+        run: |
+          mkdir -p android/app/src/main/res/xml
+          cat << 'EOF' > android/app/src/main/res/xml/network_security_config.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <base-config cleartextTrafficPermitted="true">
+                  <trust-anchors>
+                      <certificates src="system" />
+                      <certificates src="user" />
+                  </trust-anchors>
+              </base-config>
+          </network-security-config>
+          EOF
+
+      - name: Configurar AndroidManifest.xml (TV Leanback + Aceleracao de Hardware)
         run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -49,7 +64,8 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:banner="@mipmap/ic_launcher"
                   android:hardwareAccelerated="true"
-                  android:usesCleartextTraffic="true">
+                  android:usesCleartextTraffic="true"
+                  android:networkSecurityConfig="@xml/network_security_config">
 
                   <activity
                       android:name=".MainActivity"
@@ -83,7 +99,7 @@ jobs:
           </manifest>
           EOF
 
-      - name: Injetar Ponte Nativa no MainActivity.kt (Auto-Detect TV/Celular, Brilho e Volume)
+      - name: Injetar Ponte Nativa no MainActivity.kt (Auto-Detect TV, Brilho, Volume e OTA)
         run: |
           MAIN_KT=$(find android/app/src/main -name "MainActivity.kt" | head -n 1)
           PKG_LINE=$(grep "^package " "$MAIN_KT" | head -n 1)
@@ -97,6 +113,8 @@ jobs:
           import android.content.res.Configuration
           import android.media.AudioManager
           import android.net.Uri
+          import android.os.Bundle
+          import android.view.WindowManager
           import io.flutter.embedding.android.FlutterActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
@@ -104,6 +122,11 @@ jobs:
 
           class MainActivity : FlutterActivity() {
               private val CHANNEL = "unex.vision/native"
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+              }
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
@@ -187,5 +210,5 @@ jobs:
       - name: Disponibilizar APK para Download
         uses: actions/upload-artifact@v4
         with:
-          name: unex-vision-release-apk
+          name: unex-vision-v2-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
