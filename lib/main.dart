@@ -55,7 +55,7 @@ class UnexVisionApp extends StatelessWidget {
 }
 
 // =============================================================================
-// 1. BOOT AUTOMÁTICO (AUTO-DETECÇÃO DE APARELHO + SESSÃO SALVA)
+// BOOT AUTOMÁTICO
 // =============================================================================
 class BootRouterScreen extends StatefulWidget {
   const BootRouterScreen({super.key});
@@ -103,7 +103,7 @@ class _BootRouterScreenState extends State<BootRouterScreen> {
 }
 
 // =============================================================================
-// 2. LOGIN INTELIGENTE (HIGIENIZAÇÃO DE URL + BLOQUEIO DE VENCIMENTO)
+// LOGIN INTELIGENTE (SEM TECLADO NATIVO DA TV)
 // =============================================================================
 class LoginGatewayScreen extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -477,7 +477,7 @@ class _LoginGatewayScreenState extends State<LoginGatewayScreen> {
 }
 
 // =============================================================================
-// 3. PAINEL PRINCIPAL (API XTREAM ULTRA-RÁPIDA + FALLBACK M3U + SUPERFÍCIE 16:9)
+// PAINEL PRINCIPAL (DASHBOARD)
 // =============================================================================
 class MainDashboard extends StatefulWidget {
   final DeviceMode deviceMode;
@@ -509,7 +509,6 @@ class _MainDashboardState extends State<MainDashboard> {
   bool isLoading = true;
   String loadingStatus = 'A conectar ao servidor...';
   String errorMessage = '';
-  bool _adultUnlocked = false;
 
   List<StreamItem> allItems = [], liveItems = [], movieItems = [], seriesItems = [];
   List<SeriesGroup> allSeriesGroups = [], displayedSeries = [];
@@ -582,13 +581,11 @@ class _MainDashboardState extends State<MainDashboard> {
     recentItems = await AppStorage.loadRecents();
     vodProgressMap = await AppStorage.loadVodProgressMap();
 
-    // 1. Abertura instantânea pelo cache local se existir
     final cached = await AppStorage.loadOfflinePlaylist();
     if (cached.isNotEmpty && mounted) {
       await _applyCatalog(cached, null, startFirstChannel: true);
     }
 
-    // 2. Prioridade 1: Carregamento rápido via Xtream Codes API JSON (não estoura memória na TV!)
     final creds = XtreamCatalogService.extractXtreamCredentials(
       serverDns: widget.serverDns,
       username: widget.username,
@@ -620,7 +617,6 @@ class _MainDashboardState extends State<MainDashboard> {
       }
     }
 
-    // 3. Prioridade 2 (Fallback): Download direto da lista M3U
     try {
       if (mounted && cached.isEmpty) {
         setState(() => loadingStatus = 'A transferir lista M3U completa...');
@@ -674,9 +670,7 @@ class _MainDashboardState extends State<MainDashboard> {
         series.add(i);
       }
     }
-    final List<SeriesGroup> grouped = preGroupedSeries != null
-        ? preGroupedSeries
-        : await compute(groupSeriesItems, series);
+    final List<SeriesGroup> grouped = preGroupedSeries ?? await compute(groupSeriesItems, series);
     if (!mounted) return;
     setState(() {
       allItems = items;
@@ -739,35 +733,23 @@ class _MainDashboardState extends State<MainDashboard> {
 
   List<StreamItem> _baseList(MainSection sec) {
     switch (sec) {
-      case MainSection.live:
-        return liveItems;
-      case MainSection.movie:
-        return movieItems;
-      case MainSection.series:
-        return seriesItems;
-      case MainSection.continueWatching:
-        return _sortedContinue.map((e) => e.item).toList();
-      case MainSection.favorites:
-        return allItems.where((i) => favoriteIds.contains(i.id)).toList();
-      case MainSection.recents:
-        return recentItems;
+      case MainSection.live: return liveItems;
+      case MainSection.movie: return movieItems;
+      case MainSection.series: return seriesItems;
+      case MainSection.continueWatching: return _sortedContinue.map((e) => e.item).toList();
+      case MainSection.favorites: return allItems.where((i) => favoriteIds.contains(i.id)).toList();
+      case MainSection.recents: return recentItems;
     }
   }
 
   String _secTitle(MainSection sec) {
     switch (sec) {
-      case MainSection.live:
-        return 'TV ao Vivo';
-      case MainSection.movie:
-        return 'Filmes';
-      case MainSection.series:
-        return 'Séries';
-      case MainSection.continueWatching:
-        return 'Continuar a Ver';
-      case MainSection.favorites:
-        return 'Os Meus Favoritos';
-      case MainSection.recents:
-        return 'Vistos Recentemente';
+      case MainSection.live: return 'TV ao Vivo';
+      case MainSection.movie: return 'Filmes';
+      case MainSection.series: return 'Séries';
+      case MainSection.continueWatching: return 'Continuar a Ver';
+      case MainSection.favorites: return 'Os Meus Favoritos';
+      case MainSection.recents: return 'Vistos Recentemente';
     }
   }
 
@@ -811,34 +793,14 @@ class _MainDashboardState extends State<MainDashboard> {
 
   void _toggleFavorite(StreamItem item) {
     setState(() {
-      if (favoriteIds.contains(item.id)) {
-        favoriteIds.remove(item.id);
-      } else {
-        favoriteIds.add(item.id);
-      }
+      if (favoriteIds.contains(item.id)) favoriteIds.remove(item.id);
+      else favoriteIds.add(item.id);
       AppStorage.saveFavorites(favoriteIds);
       if (activeSection == MainSection.favorites) _rebuildCategories();
     });
   }
 
-  void _recordRecent(StreamItem item) {
-    recentItems.removeWhere((r) => r.id == item.id);
-    recentItems.insert(0, item);
-    if (recentItems.length > 40) recentItems.removeLast();
-    AppStorage.saveRecents(recentItems);
-  }
-
-  Future<void> _openFullScreen(StreamItem item, {List<StreamItem>? customList}) async {
-    if (item.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) {
-        setState(() => _adultUnlocked = true);
-      } else {
-        return;
-      }
-    }
-
-    _recordRecent(item);
+  Future<void> _openFullScreen(StreamItem item) async {
     Duration? startPos;
     final saved = vodProgressMap[item.id];
     if (item.type != ContentType.live && saved != null && _engine.currentItem?.id != item.id) {
@@ -850,275 +812,13 @@ class _MainDashboardState extends State<MainDashboard> {
       context,
       createSmoothRoute(SmartAdaptivePlayerScreen(
         initialItem: item,
-        playlist: customList ?? (displayedItems.isNotEmpty ? displayedItems : liveItems),
+        playlist: displayedItems.isNotEmpty ? displayedItems : liveItems,
         deviceMode: _mode,
         initialStartPosition: startPos,
       )),
     );
   }
 
-  void _handlePreviewOrPlay(StreamItem item) async {
-    if (item.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) {
-        setState(() => _adultUnlocked = true);
-        _proceedPreviewOrPlay(item);
-      }
-      return;
-    }
-    _proceedPreviewOrPlay(item);
-  }
-
-  void _proceedPreviewOrPlay(StreamItem item) {
-    _recordRecent(item);
-    if (_engine.currentItem?.id == item.id && _engine.isReady) {
-      if (item.type == ContentType.movie) {
-        _showVodMetadataSheet(item);
-      } else {
-        _openFullScreen(item);
-      }
-      return;
-    }
-    _engine.openStream(item);
-  }
-
-  void _showVodMetadataSheet(StreamItem item) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF101420),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: Color(0xFF00E5FF)),
-        ),
-        title: Row(
-          children: [
-            buildQualityBadge(item.qualityTag),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Categoria: ${item.group} • Nota: ★ ${item.rating != "N/A" ? item.rating : "8.4"}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF), fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              item.synopsis != 'Nenhuma sinopse disponível.'
-                  ? item.synopsis
-                  : 'Conteúdo on-demand otimizado em alta definição (${item.qualityTag}) do catálogo ${item.group}.',
-              style: const TextStyle(fontSize: 13, color: Colors.white70),
-            ),
-          ],
-        ),
-        actions: [
-          TVFocusableItem(
-            autofocus: true,
-            onSelect: () {
-              Navigator.pop(ctx);
-              _openFullScreen(item);
-            },
-            builder: (c, f) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00E5FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: f ? Colors.white : Colors.transparent, width: 2),
-              ),
-              child: const Text('▶ Ver Agora', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
-            ),
-          ),
-          TVFocusableItem(
-            onSelect: () {
-              _toggleFavorite(item);
-              Navigator.pop(ctx);
-            },
-            builder: (c, f) => Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.white24),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(favoriteIds.contains(item.id) ? '★ Remover Favorito' : '☆ Adicionar aos Favoritos'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openSeriesEpisodesModal(SeriesGroup series) async {
-    if (series.isAdult && !_adultUnlocked) {
-      final unlocked = await showParentalPinPrompt(context);
-      if (unlocked && mounted) {
-        setState(() => _adultUnlocked = true);
-      } else {
-        return;
-      }
-    }
-
-    Map<int, List<StreamItem>> seasonsMap = series.seasons;
-    if (seasonsMap.isEmpty) {
-      final creds = XtreamCatalogService.extractXtreamCredentials(
-        serverDns: widget.serverDns,
-        username: widget.username,
-        password: widget.password,
-        directM3uUrl: widget.directM3uUrl,
-      );
-      if (creds != null) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF))),
-        );
-        seasonsMap = await XtreamCatalogService.fetchSeriesEpisodes(
-          series: series,
-          dns: creds['dns']!,
-          user: creds['user']!,
-          pass: creds['pass']!,
-        );
-        if (mounted) Navigator.pop(context);
-      }
-    }
-
-    if (!mounted) return;
-    final seasons = seasonsMap.keys.toList()..sort();
-    int selSeason = seasons.isNotEmpty ? seasons.first : 1;
-    final flatList = seasons.expand((k) => seasonsMap[k]!).toList();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModal) {
-          final eps = seasonsMap[selSeason] ?? [];
-          return Dialog(
-            backgroundColor: const Color(0xFF0D111C),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: const BorderSide(color: Color(0xFF00E5FF)),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720, maxHeight: 520),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        buildChannelLogo(series.logo, size: 54),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(series.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                              Text(
-                                '${series.group} • ${seasons.length} Temporada(s) • ${flatList.length} Episódios',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF00E5FF)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TVIconButton(icon: Icons.close, onPressed: () => Navigator.pop(ctx)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (seasons.isNotEmpty)
-                      SizedBox(
-                        height: 36,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: seasons.length,
-                          itemBuilder: (c, i) {
-                            final s = seasons[i];
-                            final active = s == selSeason;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: TVFocusableItem(
-                                autoScroll: false,
-                                onSelect: () => setModal(() => selSeason = s),
-                                builder: (c, f) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: active ? const Color(0xFF00E5FF) : const Color(0xFF171C2B),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: f ? Colors.white : Colors.transparent),
-                                  ),
-                                  child: Text(
-                                    'Temporada $s',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: active ? Colors.black : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    const Divider(color: Colors.white12, height: 18),
-                    Expanded(
-                      child: eps.isEmpty
-                          ? const Center(child: Text('Nenhum episódio disponível.', style: TextStyle(color: Colors.white54)))
-                          : ListView.builder(
-                              itemCount: eps.length,
-                              itemBuilder: (c, idx) {
-                                final ep = eps[idx];
-                                final prog = vodProgressMap[ep.id];
-                                return TVFocusableItem(
-                                  autofocus: idx == 0,
-                                  onSelect: () {
-                                    Navigator.pop(ctx);
-                                    _openFullScreen(ep, customList: flatList);
-                                  },
-                                  builder: (c, f) => Container(
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: f ? const Color(0xFF1A2842) : const Color(0xFF131724),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(color: f ? const Color(0xFF00E5FF) : Colors.white10),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          'E${ep.episodeNumber.toString().padLeft(2, '0')}',
-                                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF00E5FF)),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(ep.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                                        ),
-                                        if (prog != null)
-                                          Text('${prog.formattedPosition} ', style: const TextStyle(fontSize: 11, color: Color(0xFF00E5FF))),
-                                        const Icon(Icons.play_circle_fill, color: Color(0xFF00E5FF), size: 22),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // SUPERFÍCIE 16:9 CORRIGIDA (NUNCA NASCE COM LARGURA/ALTURA 0x0 NA TV)
   Widget _buildMiniVideo() {
     if (_engine.hasError) {
       return Center(
@@ -1207,9 +907,15 @@ class _MainDashboardState extends State<MainDashboard> {
         searchQuery = '';
         _filterContent();
       },
-      onStartPreview: _handlePreviewOrPlay,
+      onStartPreview: (item) {
+        if (_engine.currentItem?.id == item.id) {
+          _openFullScreen(item);
+        } else {
+          _engine.openStream(item);
+        }
+      },
       onOpenFullScreen: _openFullScreen,
-      onSelectSeriesGroup: _openSeriesEpisodesModal,
+      onSelectSeriesGroup: (s) {},
       onToggleFavorite: _toggleFavorite,
     );
 
@@ -1323,9 +1029,15 @@ class _MainDashboardState extends State<MainDashboard> {
                           isTVSideMenuOpen = false;
                           _filterContent();
                         }),
-                        onStartPreview: _handlePreviewOrPlay,
+                        onStartPreview: (item) {
+                          if (_engine.currentItem?.id == item.id) {
+                            _openFullScreen(item);
+                          } else {
+                            _engine.openStream(item);
+                          }
+                        },
                         onOpenFullScreen: _openFullScreen,
-                        onSelectSeriesGroup: _openSeriesEpisodesModal,
+                        onSelectSeriesGroup: (s) {},
                         onToggleFavorite: _toggleFavorite,
                       )
                     : mobileView,
