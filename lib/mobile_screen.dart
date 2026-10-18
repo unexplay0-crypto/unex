@@ -145,7 +145,7 @@ class MobileDashboardView extends StatelessWidget {
                               children: [
                                 Icon(Icons.fullscreen_rounded, color: Colors.black, size: 18),
                                 SizedBox(width: 4),
-                                Text('Tela Cheia', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900)),
+                                Text('Ecrã Inteiro', style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.w900)),
                               ],
                             ),
                           )
@@ -184,7 +184,7 @@ class MobileDashboardView extends StatelessWidget {
           ),
         ),
 
-        // 4. CARROSSEL HORIZONTAL DE GÉNEROS
+        // 4. CARROSSEL HORIZONTAL DE CATEGORIAS
         SizedBox(
           height: 40,
           child: ListView.builder(
