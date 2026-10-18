@@ -86,7 +86,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
   void _focusSideMenuNow() {
     if (!widget.isSideMenuOpen) widget.onOpenSideMenu();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _sideMenuFocus.requestFocus();
+      if (mounted && _sideMenuFocus.canRequestFocus) _sideMenuFocus.requestFocus();
     });
   }
 
@@ -95,7 +95,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     if (widget.activeItem?.id == item.id) return;
     if (item.isAdult && !_adultUnlocked) return;
 
-    // Aguarda 650ms com o foco parado sobre o canal antes de sintonizar (evita travar a TV ao rolar a lista)
     _previewDebounce = Timer(const Duration(milliseconds: 650), () {
       if (mounted && widget.activeItem?.id != item.id) {
         widget.onStartPreview(item);
@@ -119,9 +118,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     }
   }
 
-  // ===========================================================================
-  // INTERCEPTADORES DE CONTROLE PARENTAL (+18) E SELEÇÃO
-  // ===========================================================================
   Future<void> _handleChannelSelect(StreamItem item) async {
     _previewDebounce?.cancel();
     if (item.isAdult && !_adultUnlocked) {
@@ -130,7 +126,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
       setState(() => _adultUnlocked = true);
     }
 
-    // Se já está sintonizado no preview, o OK abre a Tela Cheia; senão, sintoniza imediatamente
     if (widget.activeItem?.id == item.id) {
       widget.onOpenFullScreen(item);
     } else {
@@ -181,7 +176,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
       backgroundColor: _bgColor,
       body: Row(
         children: [
-          // 1. MENU LATERAL (NAVIGATION RAIL FIXO E RECOLHÍVEL)
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
@@ -192,8 +186,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
             ),
             child: widget.isSideMenuOpen ? _buildExpandedMenu() : _buildCollapsedRail(),
           ),
-
-          // 2. CONTEÚDO DINÂMICO (TV AO VIVO 3 COLUNAS vs VOD IMERSIVO)
           Expanded(
             child: isLive ? _buildLiveTVLayout() : _buildImmersiveVodLayout(),
           ),
@@ -202,13 +194,9 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     );
   }
 
-  // ===========================================================================
-  // LAYOUT 3 COLUNAS: TV AO VIVO (ESTILO VERTU PLAY / TIVIMATE)
-  // ===========================================================================
   Widget _buildLiveTVLayout() {
     return Row(
       children: [
-        // COLUNA 1: CATEGORIAS
         Container(
           width: 230,
           color: _bgColor,
@@ -222,20 +210,10 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                   children: [
                     Text(
                       'CATEGORIAS',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white.withOpacity(0.5),
-                        letterSpacing: 1.5,
-                      ),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Colors.white.withOpacity(0.5), letterSpacing: 1.5),
                     ),
                     if (widget.searchController != null)
-                      TVIconButton(
-                        icon: Icons.search_rounded,
-                        color: _accentColor,
-                        size: 18,
-                        onPressed: _openSearchKeyboard,
-                      ),
+                      TVIconButton(icon: Icons.search_rounded, color: _accentColor, size: 18, onPressed: _openSearchKeyboard),
                   ],
                 ),
               ),
@@ -247,21 +225,10 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                     onSelect: () => widget.onClearSearch?.call(),
                     builder: (c, f) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: f ? Colors.white : Colors.redAccent),
-                      ),
+                      decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(8), border: Border.all(color: f ? Colors.white : Colors.redAccent)),
                       child: Row(
                         children: [
-                          Expanded(
-                            child: Text(
-                              'Busca: "${widget.searchQuery}"',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 11, color: Colors.white),
-                            ),
-                          ),
+                          Expanded(child: Text('Busca: "${widget.searchQuery}"', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: Colors.white))),
                           const Icon(Icons.close, size: 14, color: Colors.redAccent),
                         ],
                       ),
@@ -298,40 +265,15 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                         margin: const EdgeInsets.symmetric(vertical: 3),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSel
-                              ? _accentColor.withOpacity(0.16)
-                              : f
-                                  ? Colors.white.withOpacity(0.06)
-                                  : Colors.transparent,
+                          color: isSel ? _accentColor.withOpacity(0.16) : f ? Colors.white.withOpacity(0.06) : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: f ? _accentColor : (isSel ? _accentColor.withOpacity(0.4) : Colors.transparent),
-                            width: f ? 2 : 1,
-                          ),
+                          border: Border.all(color: f ? _accentColor : (isSel ? _accentColor.withOpacity(0.4) : Colors.transparent), width: f ? 2 : 1),
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Text(
-                                cat,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isSel ? _accentColor : Colors.white,
-                                  fontWeight: isSel || f ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ),
+                            Expanded(child: Text(cat, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: isSel ? _accentColor : Colors.white, fontWeight: isSel || f ? FontWeight.bold : FontWeight.normal))),
                             const SizedBox(width: 6),
-                            Text(
-                              '$count',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isSel ? _accentColor : Colors.white38,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            Text('$count', style: TextStyle(fontSize: 11, color: isSel ? _accentColor : Colors.white38, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -342,28 +284,18 @@ class _TVDashboardViewState extends State<TVDashboardView> {
             ],
           ),
         ),
-
-        // COLUNA 2: GRELHA DE CANAIS
         Expanded(
           child: Container(
             color: _panelColor.withOpacity(0.4),
             child: widget.displayedItems.isEmpty
-                ? const Center(
-                    child: Text('Nenhum canal encontrado nesta categoria.', style: TextStyle(color: Colors.white54)),
-                  )
+                ? const Center(child: Text('Nenhum canal encontrado nesta categoria.', style: TextStyle(color: Colors.white54)))
                 : GridView.builder(
                     padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 280,
-                      mainAxisExtent: 82,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 280, mainAxisExtent: 82, crossAxisSpacing: 12, mainAxisSpacing: 12),
                     itemCount: widget.displayedItems.length,
                     itemBuilder: (context, idx) {
                       final item = widget.displayedItems[idx];
                       final isPlaying = widget.activeItem?.id == item.id;
-
                       return TVFocusableItem(
                         onSelect: () => _handleChannelSelect(item),
                         builder: (c, f) {
@@ -377,17 +309,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                               decoration: BoxDecoration(
                                 color: isPlaying ? _accentColor.withOpacity(0.16) : _panelColor,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: f
-                                      ? _accentColor
-                                      : isPlaying
-                                          ? _accentColor.withOpacity(0.5)
-                                          : Colors.white.withOpacity(0.05),
-                                  width: f ? 2.5 : 1.2,
-                                ),
-                                boxShadow: f
-                                    ? [BoxShadow(color: _accentColor.withOpacity(0.22), blurRadius: 10)]
-                                    : null,
+                                border: Border.all(color: f ? _accentColor : isPlaying ? _accentColor.withOpacity(0.5) : Colors.white.withOpacity(0.05), width: f ? 2.5 : 1.2),
+                                boxShadow: f ? [BoxShadow(color: _accentColor.withOpacity(0.22), blurRadius: 10)] : null,
                               ),
                               child: Row(
                                 children: [
@@ -398,29 +321,13 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          item.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                        ),
+                                        Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
                                             buildQualityBadge(item.qualityTag),
                                             const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                isPlaying ? '▶ OK p/ Tela Cheia' : item.group,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: isPlaying ? _accentColor : Colors.white54,
-                                                  fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
-                                                ),
-                                              ),
-                                            ),
+                                            Expanded(child: Text(isPlaying ? '▶ OK p/ Ecrã Inteiro' : item.group, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: isPlaying ? _accentColor : Colors.white54, fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal))),
                                           ],
                                         ),
                                       ],
@@ -436,27 +343,14 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                   ),
           ),
         ),
-
-        // COLUNA 3: DOCK DE PRÉ-VISUALIZAÇÃO (EPG + TELA CHEIA)
         Container(
           width: 310,
-          decoration: BoxDecoration(
-            color: _bgColor,
-            border: Border(left: BorderSide(color: Colors.white.withOpacity(0.05))),
-          ),
+          decoration: BoxDecoration(color: _bgColor, border: Border(left: BorderSide(color: Colors.white.withOpacity(0.05)))),
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'PRÉ-VISUALIZAÇÃO AO VIVO',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withOpacity(0.5),
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.4,
-                ),
-              ),
+              Text('PRÉ-VISUALIZAÇÃO AO VIVO', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.bold, letterSpacing: 1.4)),
               const SizedBox(height: 14),
               AspectRatio(
                 aspectRatio: 16 / 9,
@@ -481,17 +375,9 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            widget.activeItem!.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
-                          ),
+                          Text(widget.activeItem!.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 2),
-                          Text(
-                            widget.activeItem!.group,
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _accentColor),
-                          ),
+                          Text(widget.activeItem!.group, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _accentColor)),
                         ],
                       ),
                     ),
@@ -508,22 +394,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                       duration: const Duration(milliseconds: 140),
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 13),
-                        decoration: BoxDecoration(
-                          color: f ? Colors.white : _accentColor,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: f ? [BoxShadow(color: _accentColor.withOpacity(0.4), blurRadius: 12)] : null,
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'TELA CHEIA',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
+                        decoration: BoxDecoration(color: f ? Colors.white : _accentColor, borderRadius: BorderRadius.circular(12), boxShadow: f ? [BoxShadow(color: _accentColor.withOpacity(0.4), blurRadius: 12)] : null),
+                        child: const Center(child: Text('ECRÃ INTEIRO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.2))),
                       ),
                     ),
                   ),
@@ -536,23 +408,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                     onSelect: () => widget.onToggleFavorite(widget.activeItem!),
                     builder: (c, f) => Container(
                       padding: const EdgeInsets.symmetric(vertical: 11),
-                      decoration: BoxDecoration(
-                        color: f ? Colors.white.withOpacity(0.1) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: f ? Colors.white : Colors.white24),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.favoriteIds.contains(widget.activeItem!.id)
-                              ? '★ Remover Favorito'
-                              : '☆ Adicionar Favorito',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: f ? Colors.white : Colors.white70,
-                          ),
-                        ),
-                      ),
+                      decoration: BoxDecoration(color: f ? Colors.white.withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(12), border: Border.all(color: f ? Colors.white : Colors.white24)),
+                      child: Center(child: Text(widget.favoriteIds.contains(widget.activeItem!.id) ? '★ Remover Favorito' : '☆ Adicionar Favorito', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: f ? Colors.white : Colors.white70))),
                     ),
                   ),
                 ),
@@ -564,56 +421,22 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     );
   }
 
-  // ===========================================================================
-  // LAYOUT IMERSIVO: FILMES E SÉRIES (ESTILO NETFLIX / MAX A 60 FPS)
-  // ===========================================================================
   Widget _buildImmersiveVodLayout() {
     final isSeries = widget.activeSection == MainSection.series;
     final bgUrl = isSeries ? _focusedSeriesGroup?.logo : _focusedVodItem?.logo;
-    final title = isSeries
-        ? (_focusedSeriesGroup?.title ?? widget.sectionTitle)
-        : (_focusedVodItem?.name ?? widget.sectionTitle);
-    final synopsis = isSeries
-        ? (_focusedSeriesGroup?.synopsis ?? 'Selecione uma série abaixo para ver as temporadas e episódios.')
-        : (_focusedVodItem?.synopsis ?? 'Navegue pelos pôsteres abaixo para explorar o catálogo.');
+    final title = isSeries ? (_focusedSeriesGroup?.title ?? widget.sectionTitle) : (_focusedVodItem?.name ?? widget.sectionTitle);
+    final synopsis = isSeries ? (_focusedSeriesGroup?.synopsis ?? 'Selecione uma série abaixo para ver as temporadas e episódios.') : (_focusedVodItem?.synopsis ?? 'Navegue pelos pósteres abaixo para explorar o catálogo.');
     final badge = isSeries ? _focusedSeriesGroup?.qualityTag : _focusedVodItem?.qualityTag;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 1. BACKGROUND OTIMIZADO DE ALTA PERFORMANCE
         if (bgUrl != null && bgUrl.isNotEmpty)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).size.height * 0.72,
-            child: Image.network(
-              bgUrl,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              cacheWidth: 600,
-              errorBuilder: (_, __, ___) => Container(color: _bgColor),
-            ),
-          ),
-
-        // Gradiente Escuro (Vignette) para leitura cristalina a 3 metros
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [_bgColor.withOpacity(0.25), _bgColor.withOpacity(0.85), _bgColor],
-              stops: const [0.0, 0.45, 0.82],
-            ),
-          ),
-        ),
-
-        // 2. CONTEÚDO (FILTRO DE GÊNEROS + HERO BANNER + CARROSSEL)
+          Positioned(top: 0, left: 0, right: 0, height: MediaQuery.of(context).size.height * 0.72, child: Image.network(bgUrl, fit: BoxFit.cover, alignment: Alignment.topCenter, cacheWidth: 600, errorBuilder: (_, __, ___) => Container(color: _bgColor))),
+        Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [_bgColor.withOpacity(0.25), _bgColor.withOpacity(0.85), _bgColor], stops: const [0.0, 0.45, 0.82]))),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Barra Superior de Gêneros e Pesquisa
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 20, 32, 0),
               child: SizedBox(
@@ -627,25 +450,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                         onSelect: _openSearchKeyboard,
                         builder: (c, f) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: f ? _accentColor : _panelColor,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: f ? Colors.white : Colors.white24),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.search, size: 16, color: f ? Colors.black : _accentColor),
-                              const SizedBox(width: 6),
-                              Text(
-                                widget.searchQuery.isEmpty ? 'Pesquisar' : '"${widget.searchQuery}"',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: f ? Colors.black : Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                          decoration: BoxDecoration(color: f ? _accentColor : _panelColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: f ? Colors.white : Colors.white24)),
+                          child: Row(children: [ Icon(Icons.search, size: 16, color: f ? Colors.black : _accentColor), const SizedBox(width: 6), Text(widget.searchQuery.isEmpty ? 'Pesquisar' : '"${widget.searchQuery}"', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: f ? Colors.black : Colors.white)) ]),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -664,23 +470,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                               onSelect: () => widget.onSelectCategory(cat),
                               builder: (c, f) => Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSel
-                                      ? _accentColor
-                                      : f
-                                          ? Colors.white24
-                                          : _panelColor.withOpacity(0.8),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: f ? Colors.white : Colors.white12),
-                                ),
-                                child: Text(
-                                  cat,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: isSel ? Colors.black : Colors.white,
-                                  ),
-                                ),
+                                decoration: BoxDecoration(color: isSel ? _accentColor : f ? Colors.white24 : _panelColor.withOpacity(0.8), borderRadius: BorderRadius.circular(20), border: Border.all(color: f ? Colors.white : Colors.white12)),
+                                child: Text(cat, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isSel ? Colors.black : Colors.white)),
                               ),
                             ),
                           );
@@ -691,8 +482,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                 ),
               ),
             ),
-
-            // Hero Banner Central
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(36, 16, 36, 0),
@@ -702,38 +491,14 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                   children: [
                     if (badge != null) buildQualityBadge(badge),
                     const SizedBox(height: 10),
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 38,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w900, height: 1.1, letterSpacing: 0.5)),
                     const SizedBox(height: 10),
-                    SizedBox(
-                      width: 650,
-                      child: Text(
-                        synopsis,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withOpacity(0.75),
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
+                    SizedBox(width: 650, child: Text(synopsis, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.75), height: 1.4))),
                     const SizedBox(height: 18),
                   ],
                 ),
               ),
             ),
-
-            // 3. CARROSSEL DE PÔSTERES
             SizedBox(
               height: 265,
               child: isSeries
@@ -749,20 +514,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                           onSelect: () => _handleSeriesSelect(s),
                           builder: (c, f) {
                             if (f) _updateFocusedSeries(s);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 18),
-                              child: AspectRatio(
-                                aspectRatio: 0.68,
-                                child: buildStreamingPosterCard(
-                                  title: s.title,
-                                  subtitle: s.group,
-                                  logoUrl: s.logo,
-                                  badgeText: s.qualityTag,
-                                  isFocused: f,
-                                  onTap: () => _handleSeriesSelect(s),
-                                ),
-                              ),
-                            );
+                            return Padding(padding: const EdgeInsets.only(right: 18), child: AspectRatio(aspectRatio: 0.68, child: buildStreamingPosterCard(title: s.title, subtitle: s.group, logoUrl: s.logo, badgeText: s.qualityTag, isFocused: f, onTap: () => _handleSeriesSelect(s))));
                           },
                         );
                       },
@@ -781,22 +533,7 @@ class _TVDashboardViewState extends State<TVDashboardView> {
                           onSelect: () => _handleFullScreen(item),
                           builder: (c, f) {
                             if (f) _updateFocusedVod(item);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 18),
-                              child: AspectRatio(
-                                aspectRatio: 0.68,
-                                child: buildStreamingPosterCard(
-                                  title: item.name,
-                                  subtitle: item.group,
-                                  logoUrl: item.logo,
-                                  badgeText: item.qualityTag,
-                                  isFocused: f,
-                                  isFavorite: isFav,
-                                  progress: prog?.progress,
-                                  onTap: () => _handleFullScreen(item),
-                                ),
-                              ),
-                            );
+                            return Padding(padding: const EdgeInsets.only(right: 18), child: AspectRatio(aspectRatio: 0.68, child: buildStreamingPosterCard(title: item.name, subtitle: item.group, logoUrl: item.logo, badgeText: item.qualityTag, isFocused: f, isFavorite: isFav, progress: prog?.progress, onTap: () => _handleFullScreen(item))));
                           },
                         );
                       },
@@ -809,9 +546,6 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     );
   }
 
-  // ===========================================================================
-  // MENU PRINCIPAL LATERAL (RECOLHIDO vs EXPANDIDO)
-  // ===========================================================================
   Widget _buildCollapsedRail() {
     return Column(
       children: [
@@ -835,17 +569,8 @@ class _TVDashboardViewState extends State<TVDashboardView> {
         autoScroll: false,
         onSelect: _focusSideMenuNow,
         builder: (c, f) {
-          if (f) {
-            WidgetsBinding.instance.addPostFrameCallback((_) => _focusSideMenuNow());
-          }
-          return Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: sel ? _accentColor.withOpacity(0.2) : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 22, color: sel ? _accentColor : Colors.white54),
-          );
+          if (f) WidgetsBinding.instance.addPostFrameCallback((_) => _focusSideMenuNow());
+          return Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: sel ? _accentColor.withOpacity(0.2) : Colors.transparent, borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 22, color: sel ? _accentColor : Colors.white54));
         },
       ),
     );
@@ -855,73 +580,25 @@ class _TVDashboardViewState extends State<TVDashboardView> {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 20),
-          child: Text(
-            'UNEX VISION',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: _accentColor,
-              fontSize: 16,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
+        Padding(padding: const EdgeInsets.only(left: 8, bottom: 20), child: Text('UNEX VISION', style: TextStyle(fontWeight: FontWeight.w900, color: _accentColor, fontSize: 16, letterSpacing: 1.5))),
         _buildNav('TV ao Vivo', MainSection.live, Icons.live_tv_rounded),
         _buildNav('Filmes', MainSection.movie, Icons.movie_creation_rounded),
         _buildNav('Séries', MainSection.series, Icons.video_library_rounded),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Divider(color: Colors.white10),
-        ),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(color: Colors.white10)),
         _buildNav('Continuar a Ver', MainSection.continueWatching, Icons.play_circle_filled_rounded),
         _buildNav('Os Meus Favoritos', MainSection.favorites, Icons.star_rounded),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Divider(color: Colors.white10),
-        ),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(color: Colors.white10)),
         if (widget.onRefreshPlaylist != null)
           TVFocusableItem(
             onMoveRight: widget.onCloseSideMenu,
-            onSelect: () {
-              widget.onCloseSideMenu();
-              widget.onRefreshPlaylist!();
-            },
-            builder: (c, f) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(
-                color: f ? Colors.white.withOpacity(0.08) : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.refresh_rounded, size: 20, color: Colors.white70),
-                  SizedBox(width: 14),
-                  Text('Atualizar Lista', style: TextStyle(fontSize: 13, color: Colors.white)),
-                ],
-              ),
-            ),
+            onSelect: () { widget.onCloseSideMenu(); widget.onRefreshPlaylist!(); },
+            builder: (c, f) => Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12), margin: const EdgeInsets.symmetric(vertical: 4), decoration: BoxDecoration(color: f ? Colors.white.withOpacity(0.08) : Colors.transparent, borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.refresh_rounded, size: 20, color: Colors.white70), SizedBox(width: 14), Text('Atualizar Lista', style: TextStyle(fontSize: 13, color: Colors.white))])),
           ),
         if (widget.onLogout != null)
           TVFocusableItem(
             onMoveRight: widget.onCloseSideMenu,
             onSelect: widget.onLogout!,
-            builder: (c, f) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(
-                color: f ? Colors.redAccent.withOpacity(0.2) : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent),
-                  SizedBox(width: 14),
-                  Text('Trocar Conta', style: TextStyle(fontSize: 13, color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
+            builder: (c, f) => Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12), margin: const EdgeInsets.symmetric(vertical: 4), decoration: BoxDecoration(color: f ? Colors.redAccent.withOpacity(0.2) : Colors.transparent, borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent), SizedBox(width: 14), Text('Trocar Conta', style: TextStyle(fontSize: 13, color: Colors.redAccent, fontWeight: FontWeight.bold))])),
           ),
       ],
     );
@@ -935,30 +612,9 @@ class _TVDashboardViewState extends State<TVDashboardView> {
       onMoveRight: widget.onCloseSideMenu,
       onSelect: () => widget.onSelectSection(section),
       builder: (c, f) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: sel ? _accentColor : (f ? Colors.white.withOpacity(0.08) : Colors.transparent),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: sel ? Colors.black : Colors.white70),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: sel ? Colors.black : Colors.white,
-                  fontWeight: sel ? FontWeight.w900 : FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14), margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(color: sel ? _accentColor : (f ? Colors.white.withOpacity(0.08) : Colors.transparent), borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [ Icon(icon, size: 22, color: sel ? Colors.black : Colors.white70), const SizedBox(width: 14), Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: sel ? Colors.black : Colors.white, fontWeight: sel ? FontWeight.w900 : FontWeight.bold))) ]),
       ),
     );
   }
