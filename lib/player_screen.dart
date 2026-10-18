@@ -304,7 +304,7 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
                                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E5FF), foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
                                 icon: const Icon(Icons.refresh_rounded),
                                 label: const Text('Tentar Novamente', style: TextStyle(fontWeight: FontWeight.w900)),
-                                onPressed: () => _engine.openStream(currentItem, forceReload: true, tryHlsFallback: true),
+                                onPressed: () => _engine.openStream(currentItem, forceReload: true), // REMOVIDO tryHlsFallback
                               )
                             ],
                           )
