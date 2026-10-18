@@ -46,7 +46,6 @@ class _SmartAdaptivePlayerScreenState extends State<SmartAdaptivePlayerScreen> {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     currentItem = widget.initialItem;
 
-    // Se não for o vídeo atual, inicia. Se já estiver a rolar, só faz seek se for VOD.
     if (_engine.currentItem?.id != currentItem.id) {
       _engine.openStream(currentItem, startPosition: widget.initialStartPosition);
     } else if (widget.initialStartPosition != null && currentItem.type != ContentType.live) {
