@@ -19,7 +19,7 @@ enum ContentType { live, movie, series }
 enum MainSection { live, movie, series, continueWatching, favorites, recents }
 
 // =============================================================================
-// 1. MODELOS DE DADOS E VOD (COM METADADOS EXPANDIDOS)
+// 1. MODELOS DE DADOS E METADADOS
 // =============================================================================
 class StreamItem {
   final String id;
@@ -144,13 +144,13 @@ class SeriesGroup {
 // =============================================================================
 class AppStorage {
   static String get _tmp => Directory.systemTemp.path;
-  static File get _sessionFile => File('$_tmp/unex_verified_session_v11.json');
-  static File get _deviceFile => File('$_tmp/unex_device_mode_v11.json');
-  static File get _vodProgressFile => File('$_tmp/unex_vod_progress_v11.json');
-  static File get _favoritesFile => File('$_tmp/unex_favorites_v11.json');
-  static File get _recentsFile => File('$_tmp/unex_recents_v11.json');
-  static File get _offlinePlaylistFile => File('$_tmp/unex_offline_playlist_v11.json');
-  static File get _parentalPinFile => File('$_tmp/unex_parental_pin_v11.txt');
+  static File get _sessionFile => File('$_tmp/unex_verified_session_v12.json');
+  static File get _deviceFile => File('$_tmp/unex_device_mode_v12.json');
+  static File get _vodProgressFile => File('$_tmp/unex_vod_progress_v12.json');
+  static File get _favoritesFile => File('$_tmp/unex_favorites_v12.json');
+  static File get _recentsFile => File('$_tmp/unex_recents_v12.json');
+  static File get _offlinePlaylistFile => File('$_tmp/unex_offline_playlist_v12.json');
+  static File get _parentalPinFile => File('$_tmp/unex_parental_pin_v12.txt');
 
   static Future<DeviceMode> getOrDetectDeviceMode() async {
     try {
@@ -208,7 +208,7 @@ class AppStorage {
 
   static Future<void> saveOfflinePlaylist(List<StreamItem> items) async {
     try {
-      // Limita o cache local em 18.000 itens para não estoirar a RAM da TV Box
+      // Limite crítico de 18.000 canais no cache local para prevenir crash na inicialização das TVs
       final capped = items.length > 18000 ? items.sublist(0, 18000) : items;
       final encoded = await compute(_encodePlaylistIsolate, capped);
       await _offlinePlaylistFile.writeAsString(encoded);
@@ -266,7 +266,7 @@ String _encodePlaylistIsolate(List<StreamItem> items) => jsonEncode(items.map((e
 List<StreamItem> _decodePlaylistIsolate(String raw) => (jsonDecode(raw) as List).map((e) => StreamItem.fromJson(e)).toList();
 
 // =============================================================================
-// 3. MOTOR DE VÍDEO COMPARTILHADO BLINDADO PARA ANDROID TV E REDIRECIONAMENTOS
+// 3. MOTOR DE VÍDEO COMPARTILHADO BLINDADO (REDIRECIONAMENTO 302 + LOCK)
 // =============================================================================
 class SharedStreamEngine extends ChangeNotifier {
   static final SharedStreamEngine instance = SharedStreamEngine._internal();
@@ -280,14 +280,13 @@ class SharedStreamEngine extends ChangeNotifier {
   bool hasError = false;
   bool isRecovering = false;
 
-  int _opId = 0; // Trava de concorrência: impede crashes na TV ao navegar rápido
+  int _opId = 0; // Trava de concorrência: impede falhas de hardware ao fazer zapping
   Timer? _watchdogTimer;
   Duration _lastPosition = Duration.zero;
   int _stallCounter = 0;
 
   void Function(VodProgressEntry entry)? onVodProgressSaved;
 
-  // Resolve redirecionamentos HTTP 301/302 para contornar bloqueios em ficheiros .ts
   Future<String> _resolveRedirectUrl(String rawUrl) async {
     HttpClient? client;
     try {
@@ -318,7 +317,6 @@ class SharedStreamEngine extends ChangeNotifier {
     final List<String> candidates = [];
 
     if (item.type == ContentType.live) {
-      // Android TV / ExoPlayer prefere sempre o formato .m3u8 para streaming adaptável
       if (original.endsWith('.ts')) {
         candidates.add('${original.substring(0, original.length - 3)}.m3u8');
         candidates.add(original);
@@ -356,7 +354,7 @@ class SharedStreamEngine extends ChangeNotifier {
     hasError = false;
     isRecovering = false;
 
-    // Destruição segura do MediaCodec para libertar a TV Box
+    // Destruição segura do MediaCodec da TV
     final oldController = controller;
     controller = null;
     notifyListeners();
@@ -365,7 +363,7 @@ class SharedStreamEngine extends ChangeNotifier {
     if (oldController != null) {
       try { await oldController.pause(); } catch (_) {}
       try { await oldController.dispose(); } catch (_) {}
-      await Future.delayed(const Duration(milliseconds: 200)); // Tempo para o hardware limpar a memória
+      await Future.delayed(const Duration(milliseconds: 200)); 
     }
 
     if (myOp != _opId) return;
@@ -387,7 +385,7 @@ class SharedStreamEngine extends ChangeNotifier {
       );
 
       try {
-        await testCtrl.initialize().timeout(const Duration(seconds: 10)); // Timeout protegido de 10s
+        await testCtrl.initialize().timeout(const Duration(seconds: 10)); 
         if (myOp != _opId) {
           await testCtrl.dispose().catchError((_) {});
           return;
@@ -404,13 +402,12 @@ class SharedStreamEngine extends ChangeNotifier {
         await testCtrl.play();
         _startWatchdog();
         notifyListeners();
-        return; // Inicializado com sucesso!
+        return; 
       } catch (_) {
         await testCtrl.dispose().catchError((_) {});
       }
     }
 
-    // Se falharem todos os candidatos (ou time-out), lança o erro nativamente
     if (myOp == _opId) {
       hasError = true;
       isReady = false;
@@ -634,7 +631,7 @@ CatalogBundle _parseXtreamJsonIsolate(Map<String, String> payload) {
   bool checkAdult(String group, String name, dynamic isAdultFlag) {
     if (isAdultFlag?.toString() == '1') return true;
     final g = group.toLowerCase(); final n = name.toLowerCase();
-    return g.contains('adult') || g.contains('+18') || g.contains('xxx') || n.contains('xxx');
+    return g.contains('adult') || g.contains('+18') || g.contains('xxx') || n.contains('xxx') || g.contains('for adult');
   }
 
   String extractQuality(String name) {
